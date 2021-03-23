@@ -1,0 +1,22 @@
+{
+    "run": {
+        "runs": 1000,
+        "time": 10
+    },
+    "log": {
+        "path" : "/tmp/raft/log/checker.log"
+    },
+    "engine" : {
+        "type" : "timeout",
+        "check_spuriousness": false
+    },
+    "driver": {
+        "type": "raft",
+        "transport": {
+            "addr": "127.0.0.1:7074"
+        },
+        "master_addr": "127.0.0.1:7073",
+        "retries_limit": 5,
+        "retries_gap": 1
+    }
+}

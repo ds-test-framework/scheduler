@@ -1,2 +1,2 @@
-# ds-model-checker
-Distributed systems model checker. 
+# model-checker
+Abstract framework to work with intercepted messages of a distributed system

@@ -1,4 +1,4 @@
-module github.com/zeu5/model-checker
+module github.com/ds-test-framework/model-checker
 
 go 1.13
 

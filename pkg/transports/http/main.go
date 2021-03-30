@@ -3,14 +3,15 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
+	"github.com/ds-test-framework/model-checker/pkg/logger"
+	"github.com/ds-test-framework/model-checker/pkg/types"
 	"github.com/spf13/viper"
-	"github.com/zeu5/model-checker/pkg/logger"
-	"github.com/zeu5/model-checker/pkg/types"
 )
 
 const (
@@ -19,10 +20,22 @@ const (
 	ErrResponseReadFail = "RESPONSE_READ_FAILED"
 )
 
+var (
+	internalError    = Response{Err: "Internal server error"}
+	methodNotAllowed = Response{Err: "Method not allowed"}
+
+	allOk = Response{Status: "ok"}
+)
+
 type HttpTransport struct {
 	listenAddr string
 	outChan    chan string
 	server     *http.Server
+}
+
+type Response struct {
+	Status string `json:"status"`
+	Err    string `json:"error"`
 }
 
 func NewHttpTransport(options *viper.Viper) *HttpTransport {
@@ -42,10 +55,19 @@ func NewHttpTransport(options *viper.Viper) *HttpTransport {
 
 }
 
+func (t *HttpTransport) respond(w http.ResponseWriter, r *Response) {
+	w.Header().Add("Content-Type", "application/json")
+	respB, err := json.Marshal(r)
+	if err != nil {
+		respB, _ = json.Marshal(internalError)
+	}
+	w.Write(respB)
+}
+
 func (t *HttpTransport) Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, "Not ok!")
+		t.respond(w, &methodNotAllowed)
 		return
 	}
 	bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -54,7 +76,7 @@ func (t *HttpTransport) Handler(w http.ResponseWriter, r *http.Request) {
 		// logger.Debug(fmt.Sprintf("Transport: Received message, %s", string(bodyBytes)))
 		t.outChan <- string(bodyBytes)
 	}
-	fmt.Fprintf(w, "OK")
+	t.respond(w, &allOk)
 }
 
 func (t *HttpTransport) ReceiveChan() chan string {

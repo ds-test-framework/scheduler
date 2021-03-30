@@ -1,6 +1,6 @@
 package util
 
-import "github.com/zeu5/model-checker/pkg/types"
+import "github.com/ds-test-framework/model-checker/pkg/types"
 
 func PathEq(path1 []*types.Event, path2 []*types.Event) bool {
 	if len(path1) != len(path2) {

@@ -3,8 +3,8 @@ package random
 import (
 	"sync"
 
-	"github.com/zeu5/model-checker/pkg/types"
-	"github.com/zeu5/model-checker/pkg/util"
+	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/util"
 )
 
 type RandomScheduler struct {

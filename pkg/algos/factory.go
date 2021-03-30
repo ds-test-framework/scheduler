@@ -3,22 +3,41 @@ package algos
 import (
 	"github.com/spf13/viper"
 
-	"github.com/zeu5/model-checker/pkg/algos/raft"
-	"github.com/zeu5/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/algos/common"
+	"github.com/ds-test-framework/model-checker/pkg/algos/raft"
+	"github.com/ds-test-framework/model-checker/pkg/types"
 )
 
 const (
-	ERR_INVALID_ALGO = "INVALID_ALGO"
+	ErrInvalidAlgo = "INVALID_ALGO"
 )
 
 func GetAlgoDriver(options *viper.Viper) (types.AlgoDriver, *types.Error) {
 	switch options.GetString("type") {
 	case "raft":
 		return raft.NewRaftDriver(options), nil
+	case "common":
+		h, err := GetWorkloadInjector(options)
+		if err != nil {
+			return nil, err
+		}
+		return common.NewCommonDriver(options, h), nil
 	default:
 		return nil, types.NewError(
-			ERR_INVALID_ALGO,
+			ErrInvalidAlgo,
 			"Invalid algorithm type",
+		)
+	}
+}
+
+func GetWorkloadInjector(options *viper.Viper) (common.WorkloadInjector, *types.Error) {
+	switch options.GetString("algo") {
+	case "common":
+		return common.NewCommonWorkloadInjector(), nil
+	default:
+		return nil, types.NewError(
+			ErrInvalidAlgo,
+			"Invalid directive handler type",
 		)
 	}
 }

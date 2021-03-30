@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/zeu5/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/types"
 )
 
 const (
@@ -54,8 +54,8 @@ func UnmarshalMessage(message string) (*types.Message, *types.Error) {
 	return types.NewMessage(
 		msg.M.Type,
 		strconv.FormatInt(int64(msg.ID), 10),
-		uint(msg.From),
-		uint(msg.To),
+		types.ReplicaID(strconv.Itoa(msg.From)),
+		types.ReplicaID(strconv.Itoa(msg.To)),
 		weight,
 		timeout,
 	), nil

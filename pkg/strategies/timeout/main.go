@@ -4,19 +4,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/util"
 	"github.com/spf13/viper"
-	"github.com/zeu5/model-checker/pkg/types"
-	"github.com/zeu5/model-checker/pkg/util"
 )
 
 type pendingReceives struct {
-	pendingReceives map[uint]map[uint]*types.Event
+	pendingReceives map[types.ReplicaID]map[uint]*types.Event
 	lock            *sync.Mutex
 }
 
 func newPendingReceives() *pendingReceives {
 	return &pendingReceives{
-		pendingReceives: make(map[uint]map[uint]*types.Event),
+		pendingReceives: make(map[types.ReplicaID]map[uint]*types.Event),
 		lock:            new(sync.Mutex),
 	}
 }
@@ -47,7 +47,7 @@ func (p *pendingReceives) Delete(e *types.Event) {
 	}
 }
 
-func (p *pendingReceives) Get(replica uint) []*types.Event {
+func (p *pendingReceives) Get(replica types.ReplicaID) []*types.Event {
 	result := make([]*types.Event, 0)
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -65,7 +65,7 @@ func (p *pendingReceives) Reset() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.pendingReceives = make(map[uint]map[uint]*types.Event)
+	p.pendingReceives = make(map[types.ReplicaID]map[uint]*types.Event)
 }
 
 type TimeoutEngine struct {

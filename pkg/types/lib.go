@@ -2,7 +2,8 @@ package types
 
 import "sync"
 
-type EventType = string
+type EventType string
+type ReplicaID string
 
 const (
 	Send    EventType = "Send"
@@ -14,13 +15,13 @@ type Event struct {
 	Type      EventType
 	MsgID     string
 	Timestamp int64
-	Replica   uint
+	Replica   ReplicaID
 	Prev      uint
 	Next      uint
 	lock      *sync.Mutex
 }
 
-func NewEvent(id, replica uint, t EventType, ts int64, msg string) *Event {
+func NewEvent(id uint, replica ReplicaID, t EventType, ts int64, msg string) *Event {
 	return &Event{
 		ID:        id,
 		Replica:   replica,
@@ -73,18 +74,19 @@ func (e *Event) Eq(o *Event) bool {
 }
 
 type Message struct {
-	Type         string
-	ID           string
-	From         uint
-	To           uint
-	Weight       int
-	Timeout      bool
-	SendEvent    uint
-	ReceiveEvent uint
-	lock         *sync.Mutex
+	Type         string      `json:"type"`
+	ID           string      `json:"id"`
+	From         ReplicaID   `json:"from"`
+	To           ReplicaID   `json:"to"`
+	Weight       int         `json:"weight"`
+	Timeout      bool        `json:"timeout"`
+	SendEvent    uint        `json:"-"`
+	ReceiveEvent uint        `json:"-"`
+	Msg          []byte      `json:"msg"`
+	lock         *sync.Mutex `json:"-"`
 }
 
-func NewMessage(t, id string, from, to uint, w int, timeout bool) *Message {
+func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool) *Message {
 	return &Message{
 		Type:         t,
 		ID:           id,

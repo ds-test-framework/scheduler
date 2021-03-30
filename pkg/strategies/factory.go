@@ -3,9 +3,9 @@ package strategies
 import (
 	"github.com/spf13/viper"
 
-	"github.com/zeu5/model-checker/pkg/strategies/random"
-	"github.com/zeu5/model-checker/pkg/strategies/timeout"
-	"github.com/zeu5/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/strategies/random"
+	"github.com/ds-test-framework/model-checker/pkg/strategies/timeout"
+	"github.com/ds-test-framework/model-checker/pkg/types"
 )
 
 const (

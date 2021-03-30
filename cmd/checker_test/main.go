@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/spf13/viper"
-	"github.com/zeu5/model-checker/pkg/transports/http"
+	"github.com/ds-test-framework/model-checker/pkg/transports/http"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/zeu5/model-checker/pkg/types"
-	"github.com/zeu5/model-checker/pkg/util"
+	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/util"
 )
 
 const (
@@ -15,18 +15,18 @@ const (
 )
 
 type graphManager struct {
-	latestEvents map[uint]uint
-	sends        map[uint][]uint
-	receives     map[uint][]uint
+	latestEvents map[types.ReplicaID]uint
+	sends        map[types.ReplicaID][]uint
+	receives     map[types.ReplicaID][]uint
 	graph        *types.DirectedGraph
 	lock         *sync.Mutex
 }
 
 func newGraphManager() *graphManager {
 	return &graphManager{
-		latestEvents: make(map[uint]uint),
-		sends:        make(map[uint][]uint),
-		receives:     make(map[uint][]uint),
+		latestEvents: make(map[types.ReplicaID]uint),
+		sends:        make(map[types.ReplicaID][]uint),
+		receives:     make(map[types.ReplicaID][]uint),
 		graph:        types.NewDirectedGraph(),
 		lock:         new(sync.Mutex),
 	}
@@ -120,9 +120,9 @@ func (m *graphManager) updateLatest(e *types.Event) (uint, bool) {
 
 func (m *graphManager) GetPseudo() *graphPseudoManager {
 	g := &graphPseudoManager{
-		latestEvents: make(map[uint]uint),
-		sends:        make(map[uint][]uint),
-		receives:     make(map[uint][]uint),
+		latestEvents: make(map[types.ReplicaID]uint),
+		sends:        make(map[types.ReplicaID][]uint),
+		receives:     make(map[types.ReplicaID][]uint),
 		graph:        m.graph.Clone(),
 		lock:         new(sync.Mutex),
 	}
@@ -144,16 +144,16 @@ func (m *graphManager) Reset() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.latestEvents = make(map[uint]uint)
-	m.sends = make(map[uint][]uint)
-	m.receives = make(map[uint][]uint)
+	m.latestEvents = make(map[types.ReplicaID]uint)
+	m.sends = make(map[types.ReplicaID][]uint)
+	m.receives = make(map[types.ReplicaID][]uint)
 	m.graph = types.NewDirectedGraph()
 }
 
 type graphPseudoManager struct {
-	latestEvents map[uint]uint
-	sends        map[uint][]uint
-	receives     map[uint][]uint
+	latestEvents map[types.ReplicaID]uint
+	sends        map[types.ReplicaID][]uint
+	receives     map[types.ReplicaID][]uint
 	graph        *types.DirectedGraph
 	lock         *sync.Mutex
 }

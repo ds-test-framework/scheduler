@@ -3,7 +3,7 @@ package timeout
 import (
 	"sync"
 
-	"github.com/zeu5/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/types"
 )
 
 type eventPseudoStore struct {

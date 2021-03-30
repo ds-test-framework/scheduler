@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/zeu5/model-checker/pkg/algos"
-	"github.com/zeu5/model-checker/pkg/logger"
-	"github.com/zeu5/model-checker/pkg/strategies"
-	"github.com/zeu5/model-checker/pkg/types"
+	"github.com/ds-test-framework/model-checker/pkg/algos"
+	"github.com/ds-test-framework/model-checker/pkg/logger"
+	"github.com/ds-test-framework/model-checker/pkg/strategies"
+	"github.com/ds-test-framework/model-checker/pkg/types"
 )
 
 var (

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ds-test-framework/model-checker/pkg/types"
-	"github.com/ds-test-framework/model-checker/pkg/util"
+	"github.com/ds-test-framework/scheduler/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/util"
 )
 
 const (

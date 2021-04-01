@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ds-test-framework/scheduler/pkg/logger"
+	transport "github.com/ds-test-framework/scheduler/pkg/transports/http"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/spf13/viper"
-	"github.com/ds-test-framework/model-checker/pkg/logger"
-	transport "github.com/ds-test-framework/model-checker/pkg/transports/http"
-	"github.com/ds-test-framework/model-checker/pkg/types"
 )
 
 const (

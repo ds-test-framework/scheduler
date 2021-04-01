@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ds-test-framework/model-checker/pkg/logger"
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/logger"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/spf13/viper"
 )
 

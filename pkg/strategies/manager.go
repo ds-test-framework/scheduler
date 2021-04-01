@@ -3,7 +3,7 @@ package strategies
 import (
 	"sync"
 
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 type EngineManager struct {

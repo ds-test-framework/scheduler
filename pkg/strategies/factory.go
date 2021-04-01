@@ -3,9 +3,9 @@ package strategies
 import (
 	"github.com/spf13/viper"
 
-	"github.com/ds-test-framework/model-checker/pkg/strategies/random"
-	"github.com/ds-test-framework/model-checker/pkg/strategies/timeout"
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/strategies/random"
+	"github.com/ds-test-framework/scheduler/pkg/strategies/timeout"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 const (

@@ -3,7 +3,7 @@ package common
 import (
 	"encoding/json"
 
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 const (

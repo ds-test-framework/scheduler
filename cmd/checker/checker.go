@@ -11,10 +11,10 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ds-test-framework/model-checker/pkg/algos"
-	"github.com/ds-test-framework/model-checker/pkg/logger"
-	"github.com/ds-test-framework/model-checker/pkg/strategies"
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/algos"
+	"github.com/ds-test-framework/scheduler/pkg/logger"
+	"github.com/ds-test-framework/scheduler/pkg/strategies"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 var (

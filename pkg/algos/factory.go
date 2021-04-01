@@ -3,9 +3,9 @@ package algos
 import (
 	"github.com/spf13/viper"
 
-	"github.com/ds-test-framework/model-checker/pkg/algos/common"
-	"github.com/ds-test-framework/model-checker/pkg/algos/raft"
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/algos/common"
+	"github.com/ds-test-framework/scheduler/pkg/algos/raft"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 const (

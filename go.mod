@@ -1,5 +1,5 @@
-module github.com/ds-test-framework/model-checker
+module github.com/ds-test-framework/scheduler
 
-go 1.13
+go 1.16
 
 require github.com/spf13/viper v1.7.1

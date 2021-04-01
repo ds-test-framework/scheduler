@@ -1,6 +1,6 @@
 package common
 
-import "github.com/ds-test-framework/model-checker/pkg/types"
+import "github.com/ds-test-framework/scheduler/pkg/types"
 
 type WorkloadInjector interface {
 	SetPeerStore(*PeerStore)

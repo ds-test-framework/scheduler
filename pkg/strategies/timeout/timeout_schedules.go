@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ds-test-framework/model-checker/pkg/types"
+	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 type scheduleManager struct {

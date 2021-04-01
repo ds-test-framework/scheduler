@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/ds-test-framework/scheduler/pkg/transports/http"
 	"github.com/spf13/viper"
-	"github.com/ds-test-framework/model-checker/pkg/transports/http"
 )
 
 func main() {

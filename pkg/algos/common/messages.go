@@ -13,6 +13,7 @@ const (
 var (
 	RequestMessage      string = "InterceptedMessage"
 	RequestPeerRegister string = "RegisterPeer"
+	TimeoutMessage      string = "TimeoutMessage"
 )
 
 type InterceptedMessage struct {
@@ -36,10 +37,17 @@ func (i *InterceptedMessage) Unmarshal(b []byte) error {
 	return json.Unmarshal(b, i)
 }
 
+type timeout struct {
+	Type     string `json:"type"`
+	Duration int    `json:"duration"`
+	Peer     PeerID `json:"peer"`
+}
+
 type request struct {
 	Type    string             `json:"type"`
 	Peer    *Peer              `json:"peer,omitempty"`
 	Message InterceptedMessage `json:"message,omitempty"`
+	Timeout *timeout           `json:"timeout,omitempty"`
 }
 
 type response struct {

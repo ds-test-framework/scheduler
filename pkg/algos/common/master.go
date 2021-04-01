@@ -130,6 +130,13 @@ func (master *CommonDriver) dispatchMessage(msg *InterceptedMessage) {
 	}
 }
 
+func (m *CommonDriver) dispatchTimeout(to PeerID, t string) {
+	peer, ok := m.peers.GetPeer(to)
+	if ok {
+		m.sendPeerTimeout(peer, t)
+	}
+}
+
 func (m *CommonDriver) poll() {
 	for {
 		select {
@@ -156,11 +163,13 @@ func (m *CommonDriver) poll() {
 							m.toEngine <- &types.MessageWrapper{
 								Run: run,
 								Msg: &types.Message{
-									Type: iMsg.T,
-									From: types.ReplicaID(iMsg.From),
-									To:   types.ReplicaID(iMsg.To),
-									ID:   iMsg.ID,
-									Msg:  iMsg.Msg,
+									Type:    iMsg.T,
+									From:    types.ReplicaID(iMsg.From),
+									To:      types.ReplicaID(iMsg.To),
+									ID:      iMsg.ID,
+									Msg:     iMsg.Msg,
+									Timeout: false,
+									Weight:  0,
 								},
 							}
 						}()
@@ -169,10 +178,38 @@ func (m *CommonDriver) poll() {
 					}
 				case RequestPeerRegister:
 					m.peers.AddPeer(r.Peer)
+				case TimeoutMessage:
+					m.runLock.Lock()
+					run := m.run
+					m.runLock.Unlock()
+
+					m.counterLock.Lock()
+					id := m.counter
+					m.counter += 1
+					m.counterLock.Unlock()
+
+					go func() {
+						m.toEngine <- &types.MessageWrapper{
+							Run: run,
+							Msg: &types.Message{
+								Type:    r.Timeout.Type,
+								ID:      strconv.Itoa(id),
+								From:    types.ReplicaID(r.Timeout.Peer),
+								To:      types.ReplicaID(r.Timeout.Peer),
+								Msg:     []byte{},
+								Weight:  r.Timeout.Duration,
+								Timeout: true,
+							},
+						}
+					}()
 				}
 			}
 		case msgIn := <-m.fromEngine:
-			m.msgStore.Mark(msgIn.Msg.ID)
+			if msgIn.Msg.Timeout {
+				go m.dispatchTimeout(PeerID(msgIn.Msg.To), msgIn.Msg.Type)
+			} else {
+				m.msgStore.Mark(msgIn.Msg.ID)
+			}
 		case peer := <-m.updateCh:
 			if msg, err := m.msgStore.FetchOne(peer); err == nil {
 				go m.dispatchMessage(msg)
@@ -197,6 +234,17 @@ func (m *CommonDriver) sendPeerDirective(peer *Peer, d *DirectiveMessage) (strin
 		return "", err
 	}
 	return m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/directive", string(b), transport.JsonRequest())
+}
+
+func (m *CommonDriver) sendPeerTimeout(peer *Peer, t string) {
+	timeout := &timeout{
+		Type: t,
+	}
+	b, err := json.Marshal(timeout)
+	if err != nil {
+		return
+	}
+	m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/timeout", string(b), transport.JsonRequest())
 }
 
 func (m *CommonDriver) Destroy() {

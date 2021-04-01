@@ -137,73 +137,78 @@ func (m *CommonDriver) dispatchTimeout(to PeerID, t string) {
 	}
 }
 
+func (m *CommonDriver) handleIncoming(msg string) {
+	r, err := Unmarshal(msg)
+	if err != nil {
+		return
+	}
+	switch r.Type {
+	case RequestMessage:
+		m.counterLock.Lock()
+		id := m.counter
+		m.counter += 1
+		m.counterLock.Unlock()
+
+		iMsg := r.Message
+		iMsg.ID = strconv.Itoa(id)
+
+		m.msgStore.Add(&iMsg)
+
+		if iMsg.Intercept {
+			m.runLock.Lock()
+			run := m.run
+			m.runLock.Unlock()
+			go func() {
+				m.toEngine <- &types.MessageWrapper{
+					Run: run,
+					Msg: &types.Message{
+						Type:    iMsg.T,
+						From:    types.ReplicaID(iMsg.From),
+						To:      types.ReplicaID(iMsg.To),
+						ID:      iMsg.ID,
+						Msg:     iMsg.Msg,
+						Timeout: false,
+						Weight:  0,
+					},
+				}
+			}()
+		} else {
+			m.msgStore.Mark(iMsg.ID)
+		}
+	case RequestPeerRegister:
+		m.peers.AddPeer(r.Peer)
+	case TimeoutMessage:
+		m.runLock.Lock()
+		run := m.run
+		m.runLock.Unlock()
+
+		m.counterLock.Lock()
+		id := m.counter
+		m.counter += 1
+		m.counterLock.Unlock()
+
+		go func() {
+			m.toEngine <- &types.MessageWrapper{
+				Run: run,
+				Msg: &types.Message{
+					Type:    r.Timeout.Type,
+					ID:      strconv.Itoa(id),
+					From:    types.ReplicaID(r.Timeout.Peer),
+					To:      types.ReplicaID(r.Timeout.Peer),
+					Msg:     []byte{},
+					Weight:  r.Timeout.Duration,
+					Timeout: true,
+				},
+			}
+		}()
+	}
+}
+
 func (m *CommonDriver) poll() {
 	for {
 		select {
 		case req := <-m.transportIn:
-			r, err := Unmarshal(req)
-			if err == nil {
-				switch r.Type {
-				case RequestMessage:
-					m.counterLock.Lock()
-					id := m.counter
-					m.counter += 1
-					m.counterLock.Unlock()
-
-					iMsg := r.Message
-					iMsg.ID = strconv.Itoa(id)
-
-					m.msgStore.Add(&iMsg)
-
-					if iMsg.Intercept {
-						m.runLock.Lock()
-						run := m.run
-						m.runLock.Unlock()
-						go func() {
-							m.toEngine <- &types.MessageWrapper{
-								Run: run,
-								Msg: &types.Message{
-									Type:    iMsg.T,
-									From:    types.ReplicaID(iMsg.From),
-									To:      types.ReplicaID(iMsg.To),
-									ID:      iMsg.ID,
-									Msg:     iMsg.Msg,
-									Timeout: false,
-									Weight:  0,
-								},
-							}
-						}()
-					} else {
-						m.msgStore.Mark(iMsg.ID)
-					}
-				case RequestPeerRegister:
-					m.peers.AddPeer(r.Peer)
-				case TimeoutMessage:
-					m.runLock.Lock()
-					run := m.run
-					m.runLock.Unlock()
-
-					m.counterLock.Lock()
-					id := m.counter
-					m.counter += 1
-					m.counterLock.Unlock()
-
-					go func() {
-						m.toEngine <- &types.MessageWrapper{
-							Run: run,
-							Msg: &types.Message{
-								Type:    r.Timeout.Type,
-								ID:      strconv.Itoa(id),
-								From:    types.ReplicaID(r.Timeout.Peer),
-								To:      types.ReplicaID(r.Timeout.Peer),
-								Msg:     []byte{},
-								Weight:  r.Timeout.Duration,
-								Timeout: true,
-							},
-						}
-					}()
-				}
-			}
+			go m.handleIncoming(req)
 		case msgIn := <-m.fromEngine:
 			if msgIn.Msg.Timeout {
 				go m.dispatchTimeout(PeerID(msgIn.Msg.To), msgIn.Msg.Type)

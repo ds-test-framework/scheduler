@@ -13,15 +13,23 @@ import (
 	"github.com/spf13/viper"
 )
 
-type PeerID string
-
-type Peer struct {
-	ID    PeerID                 `json:"id"`
+// Replica contains information of a replica
+type Replica struct {
+	ID    types.ReplicaID        `json:"id"`
 	Addr  string                 `json:"addr"`
 	Info  map[string]interface{} `json:"info,omitempty"`
 	Ready bool                   `json:"ready"`
 }
 
+// CommonDriver implements AlgoDriver
+// The common driver is agnostic to any specific protocol, it acts as a middleman between the replicas
+// and the strategy engine. But also as a central server which pools all the messages that the replicas
+// send between each other.
+//
+// The other role that common driver needs to fulfill is that of controlling the replicas between testing iterations.
+// For this purpose the driver sends directives to the replicas to restart/stop or start them. Once the replicas are ready,
+// the test harness has to be injected. This is done using the WorkloadInjector interface as it will contain some protocol
+// specific logic.
 type CommonDriver struct {
 	toEngine         chan *types.MessageWrapper
 	fromEngine       chan *types.MessageWrapper
@@ -37,13 +45,14 @@ type CommonDriver struct {
 	counterLock *sync.Mutex
 
 	stopCh   chan bool
-	updateCh chan PeerID
+	updateCh chan types.ReplicaID
 
 	run     int
 	runObj  *types.RunObj
 	runLock *sync.Mutex
 }
 
+// NewCommonDriver constructs a CommonDriver
 func NewCommonDriver(c *viper.Viper, workloadInjector WorkloadInjector) *CommonDriver {
 	t := transport.NewHttpTransport(c.Sub("transport"))
 	n := &CommonDriver{
@@ -55,7 +64,7 @@ func NewCommonDriver(c *viper.Viper, workloadInjector WorkloadInjector) *CommonD
 		counter:          0,
 		counterLock:      new(sync.Mutex),
 		stopCh:           make(chan bool),
-		updateCh:         make(chan PeerID, 2),
+		updateCh:         make(chan types.ReplicaID, 2),
 		transport:        t,
 		transportIn:      t.ReceiveChan(),
 
@@ -67,15 +76,18 @@ func NewCommonDriver(c *viper.Viper, workloadInjector WorkloadInjector) *CommonD
 	return n
 }
 
+// Init implements AlgoDriver
 func (m *CommonDriver) Init() {
 	go m.transport.Run()
 	go m.poll()
 }
 
+// InChan implements AlgoDriver
 func (m *CommonDriver) InChan() chan *types.MessageWrapper {
 	return m.fromEngine
 }
 
+// OutChan implements AlgoDriver
 func (m *CommonDriver) OutChan() chan *types.MessageWrapper {
 	return m.toEngine
 }
@@ -101,6 +113,7 @@ func (m *CommonDriver) waitForAllPeers() error {
 	return nil
 }
 
+// StartRun implements AlgoDriver
 func (m *CommonDriver) StartRun(run int) *types.RunObj {
 	err := m.waitForAllPeers()
 	if err != nil {
@@ -119,6 +132,7 @@ func (m *CommonDriver) StartRun(run int) *types.RunObj {
 	return runObj
 }
 
+// StopRun implements AlgoDriver
 func (m *CommonDriver) StopRun() {
 }
 
@@ -130,7 +144,7 @@ func (master *CommonDriver) dispatchMessage(msg *InterceptedMessage) {
 	}
 }
 
-func (m *CommonDriver) dispatchTimeout(to PeerID, t string) {
+func (m *CommonDriver) dispatchTimeout(to types.ReplicaID, t string) {
 	peer, ok := m.peers.GetPeer(to)
 	if ok {
 		m.sendPeerTimeout(peer, t)
@@ -138,12 +152,12 @@ func (m *CommonDriver) dispatchTimeout(to PeerID, t string) {
 }
 
 func (m *CommonDriver) handleIncoming(msg string) {
-	r, err := Unmarshal(msg)
+	r, err := unmarshal(msg)
 	if err != nil {
 		return
 	}
 	switch r.Type {
-	case RequestMessage:
+	case requestMessage:
 		m.counterLock.Lock()
 		id := m.counter
 		m.counter += 1
@@ -175,9 +189,9 @@ func (m *CommonDriver) handleIncoming(msg string) {
 		} else {
 			m.msgStore.Mark(iMsg.ID)
 		}
-	case RequestPeerRegister:
+	case requestPeerRegister:
 		m.peers.AddPeer(r.Peer)
-	case TimeoutMessage:
+	case timeoutMessage:
 		m.runLock.Lock()
 		run := m.run
 		m.runLock.Unlock()
@@ -211,7 +225,7 @@ func (m *CommonDriver) poll() {
 			go m.handleIncoming(req)
 		case msgIn := <-m.fromEngine:
 			if msgIn.Msg.Timeout {
-				go m.dispatchTimeout(PeerID(msgIn.Msg.To), msgIn.Msg.Type)
+				go m.dispatchTimeout(msgIn.Msg.To, msgIn.Msg.Type)
 			} else {
 				m.msgStore.Mark(msgIn.Msg.ID)
 			}
@@ -225,7 +239,7 @@ func (m *CommonDriver) poll() {
 	}
 }
 
-func (m *CommonDriver) sendPeerMsg(peer *Peer, msg *InterceptedMessage) {
+func (m *CommonDriver) sendPeerMsg(peer *Replica, msg *InterceptedMessage) {
 	b, err := json.Marshal(msg)
 	if err != nil {
 		return
@@ -233,7 +247,7 @@ func (m *CommonDriver) sendPeerMsg(peer *Peer, msg *InterceptedMessage) {
 	m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/message", string(b), transport.JsonRequest())
 }
 
-func (m *CommonDriver) sendPeerDirective(peer *Peer, d *DirectiveMessage) (string, error) {
+func (m *CommonDriver) sendPeerDirective(peer *Replica, d *DirectiveMessage) (string, error) {
 	b, err := json.Marshal(d)
 	if err != nil {
 		return "", err
@@ -241,7 +255,7 @@ func (m *CommonDriver) sendPeerDirective(peer *Peer, d *DirectiveMessage) (strin
 	return m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/directive", string(b), transport.JsonRequest())
 }
 
-func (m *CommonDriver) sendPeerTimeout(peer *Peer, t string) {
+func (m *CommonDriver) sendPeerTimeout(peer *Replica, t string) {
 	timeout := &timeout{
 		Type: t,
 	}
@@ -252,6 +266,7 @@ func (m *CommonDriver) sendPeerTimeout(peer *Peer, t string) {
 	m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/timeout", string(b), transport.JsonRequest())
 }
 
+// Destroy implements AlgoDriver
 func (m *CommonDriver) Destroy() {
 	close(m.stopCh)
 	m.transport.Stop()

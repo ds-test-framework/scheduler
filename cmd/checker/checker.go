@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/viper"
@@ -63,22 +64,33 @@ func (c *Checker) Run(ctx context.Context) {
 }
 
 func (c *Checker) run() {
+
+	ok := c.driver.Ready()
+	if !ok {
+		c.Stop()
+		return
+	}
+	logger.Debug("Driver ready")
+
 	runs := c.config.GetInt("run.runs")
 	runTime := c.config.GetInt("run.time")
 	for i := 0; i < runs; i++ {
-		runObj := c.driver.StartRun(i)
+		c.engineManager.FlushChannels()
 		c.engineManager.SetRun(i)
+		runObj, err := c.driver.StartRun(i)
+		if err != nil {
+			c.Stop()
+			logger.Fatal("Error starting run: " + err.Error())
+			return
+		}
 		logger.Debug(fmt.Sprintf("Started run %d", i))
 		select {
-		case _ = <-c.stopChan:
+		case <-c.stopChan:
 			return
 		case <-time.After(time.Duration(runTime) * time.Second):
-			break
 		case <-runObj.Ch:
-			break
 		}
 		c.driver.StopRun()
-		c.engineManager.FlushChannels()
 		c.engine.Reset()
 	}
 	c.Stop()
@@ -94,7 +106,7 @@ func (c *Checker) Stop() {
 func main() {
 
 	termCh := make(chan os.Signal, 1)
-	signal.Notify(termCh)
+	signal.Notify(termCh, os.Interrupt, syscall.SIGTERM)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

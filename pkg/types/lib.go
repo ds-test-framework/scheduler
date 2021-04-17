@@ -10,6 +10,7 @@ const (
 	Receive EventType = "Receive"
 )
 
+// Event encapsulates a message send/receive all necessary information
 type Event struct {
 	ID        uint
 	Type      EventType
@@ -73,6 +74,7 @@ func (e *Event) Eq(o *Event) bool {
 	return e.ID == o.ID
 }
 
+// Message encapsulates communication between the nodes/replicas
 type Message struct {
 	Type         string      `json:"type"`
 	ID           string      `json:"id"`
@@ -142,6 +144,7 @@ func (m *Message) Clone() *Message {
 	}
 }
 
+// MessageWrapper wraps around message annotating it with the run number
 type MessageWrapper struct {
 	Run int
 	Msg *Message

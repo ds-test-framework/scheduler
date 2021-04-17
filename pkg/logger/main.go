@@ -9,14 +9,17 @@ import (
 
 var logFile *os.File = nil
 
+// Debug logs a debug message
 func Debug(s string) {
 	log.Println(s)
 }
 
+// Fatal logs the message and exits with non-zero exit code
 func Fatal(s string) {
 	log.Fatalln(s)
 }
 
+// Init initializes the default logger with a log path if specified
 func Init(c *viper.Viper) {
 	log.SetFlags(log.Ldate | log.Ltime)
 	path := c.GetString("path")
@@ -31,6 +34,7 @@ func Init(c *viper.Viper) {
 	log.SetOutput(file)
 }
 
+// Destroy closes the log file
 func Destroy() {
 	if logFile != nil {
 		logFile.Close()

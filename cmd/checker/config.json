@@ -4,19 +4,17 @@
         "time": 10
     },
     "log": {
-        "path" : "/tmp/raft/log/checker.log"
+        "path" : "/tmp/tendermint/log/checker.log"
     },
     "engine" : {
-        "type" : "timeout",
-        "check_spuriousness": false
+        "type" : "no-op"
     },
     "driver": {
-        "type": "raft",
+        "type": "common",
+        "algo": "tendermint",
+        "num_replicas": 4,
         "transport": {
-            "addr": "127.0.0.1:7074"
-        },
-        "master_addr": "127.0.0.1:7073",
-        "retries_limit": 5,
-        "retries_gap": 1
+            "addr": "192.168.0.7:7074"
+        }
     }
 }

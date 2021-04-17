@@ -74,6 +74,10 @@ func (d *RaftDriver) Init() {
 	go d.poll()
 }
 
+func (d *RaftDriver) Ready() bool {
+	return true
+}
+
 func (d *RaftDriver) InChan() chan *types.MessageWrapper {
 	return d.engineIn
 }
@@ -171,7 +175,7 @@ func (d *RaftDriver) masterInjectWorkload() *types.Error {
 	return d.sendMasterMsg(NewControlMessage(InjectWorkload))
 }
 
-func (d *RaftDriver) StartRun(no int) *types.RunObj {
+func (d *RaftDriver) StartRun(no int) (*types.RunObj, *types.Error) {
 	d.masterReset()
 	go d.masterInjectWorkload()
 	d.lock.Lock()
@@ -183,7 +187,7 @@ func (d *RaftDriver) StartRun(no int) *types.RunObj {
 
 	d.run = no
 	d.runObj = runObj
-	return runObj
+	return runObj, nil
 }
 
 func (d *RaftDriver) StopRun() {

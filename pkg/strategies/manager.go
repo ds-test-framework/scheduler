@@ -9,13 +9,13 @@ import (
 type EngineManager struct {
 	engine types.StrategyEngine
 	// Messages coming from the engine
-	engineOut chan *types.MessageWrapper
+	fromEngine chan *types.MessageWrapper
 	// Messages going to the engine
-	engineIn chan *types.MessageWrapper
+	toEngine chan *types.MessageWrapper
 	// Messages from outside
-	in chan *types.MessageWrapper
+	fromDriver chan *types.MessageWrapper
 	// Messages to outside
-	out      chan *types.MessageWrapper
+	toDriver chan *types.MessageWrapper
 	stopChan chan bool
 	flush    bool
 	run      int
@@ -24,22 +24,22 @@ type EngineManager struct {
 
 func NewEngineManager(
 	engine types.StrategyEngine,
-	inChan chan *types.MessageWrapper,
-	outChan chan *types.MessageWrapper,
+	fromDriver chan *types.MessageWrapper,
+	toDriver chan *types.MessageWrapper,
 ) *EngineManager {
 	m := &EngineManager{
-		engine:    engine,
-		in:        inChan,
-		out:       outChan,
-		engineOut: make(chan *types.MessageWrapper, 10),
-		engineIn:  make(chan *types.MessageWrapper, 10),
-		stopChan:  make(chan bool, 2),
-		flush:     false,
-		lock:      new(sync.Mutex),
-		run:       0,
+		engine:     engine,
+		fromDriver: fromDriver,
+		toDriver:   toDriver,
+		fromEngine: make(chan *types.MessageWrapper, 10),
+		toEngine:   make(chan *types.MessageWrapper, 10),
+		stopChan:   make(chan bool, 2),
+		flush:      false,
+		lock:       new(sync.Mutex),
+		run:        0,
 	}
 
-	m.engine.SetChannels(m.engineIn, m.engineOut)
+	m.engine.SetChannels(m.toEngine, m.fromEngine)
 	return m
 }
 
@@ -53,7 +53,7 @@ func (m *EngineManager) SetRun(no int) {
 func (m *EngineManager) Run() *types.Error {
 	for {
 		select {
-		case msg, ok := <-m.in:
+		case msg, ok := <-m.fromDriver:
 			if !ok {
 				return types.NewError(
 					types.ErrChannelClosed,
@@ -64,11 +64,11 @@ func (m *EngineManager) Run() *types.Error {
 			flush := m.flush
 			run := m.run
 			m.lock.Unlock()
-			// logger.Debug(fmt.Sprintf("Sending message to engine: %v, %#v", flush, msg.Msg))
+			// logger.Debug(fmt.Sprintf("Sending message to engine: %v, %#v for run %d", flush, msg.Msg, run))
 			if !flush && msg.Run == run {
-				m.engineIn <- msg
+				m.toEngine <- msg
 			}
-		case msg, ok := <-m.engineOut:
+		case msg, ok := <-m.fromEngine:
 			if !ok {
 				return types.NewError(
 					types.ErrChannelClosed,
@@ -81,7 +81,7 @@ func (m *EngineManager) Run() *types.Error {
 			run := m.run
 			m.lock.Unlock()
 			if !flush && msg.Run == run {
-				m.out <- msg
+				m.toDriver <- msg
 			}
 		case _ = <-m.stopChan:
 			return nil
@@ -95,20 +95,20 @@ func (m *EngineManager) FlushChannels() {
 	m.lock.Unlock()
 
 	for {
-		l := len(m.in)
+		l := len(m.fromDriver)
 		if l == 0 {
 			break
 		}
-		<-m.in
+		<-m.fromDriver
 		// logger.Debug(fmt.Sprintf("Flushing: %#v", m))
 	}
 
 	for {
-		l := len(m.engineOut)
+		l := len(m.fromEngine)
 		if l == 0 {
 			break
 		}
-		<-m.engineOut
+		<-m.fromEngine
 	}
 
 	m.lock.Lock()

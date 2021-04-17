@@ -7,6 +7,7 @@ import (
 	"github.com/ds-test-framework/scheduler/pkg/util"
 )
 
+// RandomScheduler picks a random message from the current pool of messages
 type RandomScheduler struct {
 	inChan  chan *types.MessageWrapper
 	outChan chan *types.MessageWrapper
@@ -16,6 +17,7 @@ type RandomScheduler struct {
 	lock   *sync.Mutex
 }
 
+// NewRandomScheduler returns a RandomScheduler
 func NewRandomScheduler() *RandomScheduler {
 	return &RandomScheduler{
 		stopCh: make(chan bool, 1),
@@ -24,6 +26,7 @@ func NewRandomScheduler() *RandomScheduler {
 	}
 }
 
+// SetChannels implements StrategyEngine
 func (r *RandomScheduler) SetChannels(inChan chan *types.MessageWrapper, outChan chan *types.MessageWrapper) {
 	r.inChan = inChan
 	r.outChan = outChan
@@ -96,16 +99,19 @@ func (r *RandomScheduler) pollInChan() {
 	}
 }
 
+// Run implements StrategyEngine
 func (r *RandomScheduler) Run() *types.Error {
 	go r.pollInChan()
 	go r.scheduleMessages()
 	return nil
 }
 
+// Stop implements StrategyEngine
 func (r *RandomScheduler) Stop() {
 	close(r.stopCh)
 }
 
+// Reset implements StrategyEngine
 func (r *RandomScheduler) Reset() {
 	r.lock.Lock()
 	r.msgMap = make(map[string]*types.MessageWrapper)

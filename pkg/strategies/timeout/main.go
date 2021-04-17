@@ -68,6 +68,9 @@ func (p *pendingReceives) Reset() {
 	p.pendingReceives = make(map[types.ReplicaID]map[uint]*types.Event)
 }
 
+// TimeoutEngine randomly schedules timeouts such that spuriousness is not violated
+// For every incoming message two events corresponding to the send/receive are created. The send is immediately added to the causal order maintained as a DAG.
+// Receive event is added only if there are no conflicts. Otherwise they are delayed by a randomly chosen time period
 type TimeoutEngine struct {
 	inChan       chan *types.MessageWrapper
 	outChan      chan *types.MessageWrapper
@@ -88,6 +91,7 @@ type TimeoutEngine struct {
 	scheduleManager *scheduleManager
 }
 
+// NewTimeoutEngine returns a TimeoutEngine
 func NewTimeoutEngine(o *viper.Viper) *TimeoutEngine {
 	o.SetDefault("check_spuriousness", true)
 
@@ -111,6 +115,7 @@ func NewTimeoutEngine(o *viper.Viper) *TimeoutEngine {
 	return e
 }
 
+// Reset implements StrategyEngine
 func (e *TimeoutEngine) Reset() {
 	e.pausedLock.Lock()
 	e.paused = true
@@ -372,35 +377,20 @@ func (e *TimeoutEngine) pollInChan() {
 	}
 }
 
+// Run implements StrategyEngine
 func (e *TimeoutEngine) Run() *types.Error {
 	go e.pollEventChan()
 	go e.pollInChan()
 	return nil
 }
 
-// func (e *TimeoutEngine) Run() *types.Error {
-// 	for {
-// 		select {
-// 		case msg, more := <-e.inChan:
-// logger.Debug(fmt.Sprintf("Engine: received message: %#v", msg.Msg))
-// 			if !more {
-// 				return types.NewError(
-// 					types.ErrChannelClosed,
-// 					"Engine in channel closed",
-// 				)
-// 			}
-// 			e.outChan <- msg
-// 		case <-e.stopChan:
-// 			return nil
-// 		}
-// 	}
-// }
-
+// Stop implements StrategyEngine
 func (e *TimeoutEngine) Stop() {
 	e.stopChan <- true
 	e.stopChan <- true
 }
 
+// SetChannels implements StrategyEngine
 func (e *TimeoutEngine) SetChannels(
 	inChan chan *types.MessageWrapper,
 	outChan chan *types.MessageWrapper,

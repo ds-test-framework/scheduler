@@ -17,7 +17,7 @@ const (
 type InterceptedMessage struct {
 	From      types.ReplicaID `json:"from"`
 	To        types.ReplicaID `json:"to"`
-	Msg       []byte          `json:"msg"`
+	Msg       string          `json:"msg"`
 	T         string          `json:"type"`
 	ID        string          `json:"id"`
 	Intercept bool            `json:"intercept"`
@@ -62,7 +62,7 @@ func unmarshal(msg string) (*request, *types.Error) {
 	if err != nil {
 		return nil, types.NewError(
 			ErrFailedToUnmarshal,
-			"Failed to unmarshal request",
+			"Failed to unmarshal request: "+err.Error(),
 		)
 	}
 	return r, nil

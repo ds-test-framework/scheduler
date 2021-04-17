@@ -2,15 +2,20 @@ package common
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/ds-test-framework/scheduler/pkg/logger"
 	transport "github.com/ds-test-framework/scheduler/pkg/transports/http"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/spf13/viper"
+)
+
+const (
+	ErrPeersNotReady = "ERR_PEERS_NOT_READY"
 )
 
 // Replica contains information of a replica
@@ -53,6 +58,11 @@ type CommonDriver struct {
 }
 
 // NewCommonDriver constructs a CommonDriver
+// Config options expected
+// - type: common
+// - algo: for fetching the workload injector of the specific algorithm
+// - transport: transport config options
+// - num_replicas: number of replicas that are used for testing
 func NewCommonDriver(c *viper.Viper, workloadInjector WorkloadInjector) *CommonDriver {
 	t := transport.NewHttpTransport(c.Sub("transport"))
 	n := &CommonDriver{
@@ -92,12 +102,15 @@ func (m *CommonDriver) OutChan() chan *types.MessageWrapper {
 	return m.toEngine
 }
 
-func (m *CommonDriver) waitForAllPeers() error {
+func (m *CommonDriver) waitForAllPeers() *types.Error {
 	timer := time.After(10 * time.Second)
 	for {
 		select {
 		case <-timer:
-			return errors.New("not all peers connected and ready")
+			return types.NewError(
+				ErrPeersNotReady,
+				"All peers not connected",
+			)
 		default:
 		}
 		if m.peers.Count() != m.totalPeers {
@@ -113,27 +126,57 @@ func (m *CommonDriver) waitForAllPeers() error {
 	return nil
 }
 
+func (m *CommonDriver) Ready() bool {
+	for {
+		select {
+		case <-m.stopCh:
+			return false
+		default:
+		}
+
+		if m.peers.Count() == m.totalPeers {
+			return true
+		}
+	}
+}
+
+func (m *CommonDriver) restartPeers() {
+	var wg sync.WaitGroup
+	for _, p := range m.peers.Iter() {
+		wg.Add(1)
+		go func(peer *Replica) {
+			m.sendPeerDirective(peer, &RestartDirective)
+			wg.Done()
+		}(p)
+	}
+	wg.Wait()
+}
+
 // StartRun implements AlgoDriver
-func (m *CommonDriver) StartRun(run int) *types.RunObj {
+func (m *CommonDriver) StartRun(run int) (*types.RunObj, *types.Error) {
 	err := m.waitForAllPeers()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	m.workloadInjector.InjectWorkLoad()
-
-	m.runLock.Lock()
-	defer m.runLock.Unlock()
 
 	runObj := &types.RunObj{
 		Ch: make(chan bool, 1),
 	}
+	m.restartPeers()
+
+	m.runLock.Lock()
 	m.run = run
 	m.runObj = runObj
-	return runObj
+	m.runLock.Unlock()
+
+	m.workloadInjector.InjectWorkLoad()
+
+	return runObj, nil
 }
 
 // StopRun implements AlgoDriver
 func (m *CommonDriver) StopRun() {
+	m.restartPeers()
 }
 
 func (master *CommonDriver) dispatchMessage(msg *InterceptedMessage) {
@@ -151,9 +194,20 @@ func (m *CommonDriver) dispatchTimeout(to types.ReplicaID, t string) {
 	}
 }
 
+func (m *CommonDriver) checkPeer(peer *Replica) {
+	resp, err := m.transport.SendMsg(http.MethodGet, peer.Addr+"/health", "")
+	if (err != nil && err.IsCode(transport.ErrBadResponse)) || resp != "Ok!" {
+		logger.Debug(
+			fmt.Sprintf("Could not connect to peer: %#v", peer),
+		)
+	}
+}
+
 func (m *CommonDriver) handleIncoming(msg string) {
+	// logger.Debug("Received message: " + msg)
 	r, err := unmarshal(msg)
 	if err != nil {
+		logger.Debug("Error unmarshalling message: " + err.Error())
 		return
 	}
 	switch r.Type {
@@ -173,6 +227,7 @@ func (m *CommonDriver) handleIncoming(msg string) {
 			run := m.run
 			m.runLock.Unlock()
 			go func() {
+				// logger.Debug("Sending message to engine: " + msg)
 				m.toEngine <- &types.MessageWrapper{
 					Run: run,
 					Msg: &types.Message{
@@ -180,7 +235,7 @@ func (m *CommonDriver) handleIncoming(msg string) {
 						From:    types.ReplicaID(iMsg.From),
 						To:      types.ReplicaID(iMsg.To),
 						ID:      iMsg.ID,
-						Msg:     iMsg.Msg,
+						Msg:     []byte(iMsg.Msg),
 						Timeout: false,
 						Weight:  0,
 					},
@@ -190,7 +245,9 @@ func (m *CommonDriver) handleIncoming(msg string) {
 			m.msgStore.Mark(iMsg.ID)
 		}
 	case requestPeerRegister:
+		logger.Debug(fmt.Sprintf("Peer connected: %#v", r.Peer))
 		m.peers.AddPeer(r.Peer)
+		go m.checkPeer(r.Peer)
 	case timeoutMessage:
 		m.runLock.Lock()
 		run := m.run
@@ -244,7 +301,7 @@ func (m *CommonDriver) sendPeerMsg(peer *Replica, msg *InterceptedMessage) {
 	if err != nil {
 		return
 	}
-	m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/message", string(b), transport.JsonRequest())
+	m.transport.SendMsg(http.MethodPost, peer.Addr+"/message", string(b), transport.JsonRequest())
 }
 
 func (m *CommonDriver) sendPeerDirective(peer *Replica, d *DirectiveMessage) (string, error) {
@@ -252,7 +309,7 @@ func (m *CommonDriver) sendPeerDirective(peer *Replica, d *DirectiveMessage) (st
 	if err != nil {
 		return "", err
 	}
-	return m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/directive", string(b), transport.JsonRequest())
+	return m.transport.SendMsg(http.MethodPost, peer.Addr+"/directive", string(b), transport.JsonRequest())
 }
 
 func (m *CommonDriver) sendPeerTimeout(peer *Replica, t string) {
@@ -263,7 +320,7 @@ func (m *CommonDriver) sendPeerTimeout(peer *Replica, t string) {
 	if err != nil {
 		return
 	}
-	m.transport.SendMsg(http.MethodPost, "http://"+peer.Addr+"/timeout", string(b), transport.JsonRequest())
+	m.transport.SendMsg(http.MethodPost, peer.Addr+"/timeout", string(b), transport.JsonRequest())
 }
 
 // Destroy implements AlgoDriver

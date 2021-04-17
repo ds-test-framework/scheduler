@@ -5,6 +5,7 @@ import (
 
 	"github.com/ds-test-framework/scheduler/pkg/algos/common"
 	"github.com/ds-test-framework/scheduler/pkg/algos/raft"
+	"github.com/ds-test-framework/scheduler/pkg/algos/tendermint"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
@@ -34,6 +35,8 @@ func GetWorkloadInjector(options *viper.Viper) (common.WorkloadInjector, *types.
 	switch options.GetString("algo") {
 	case "common":
 		return common.NewCommonWorkloadInjector(), nil
+	case "tendermint":
+		return tendermint.NewWorkloadInjector(), nil
 	default:
 		return nil, types.NewError(
 			ErrInvalidAlgo,

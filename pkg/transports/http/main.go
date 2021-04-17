@@ -27,17 +27,23 @@ var (
 	allOk = Response{Status: "ok"}
 )
 
+// HttpTransport wrapps around net/http to start a server and to send http messages
+// The transport sends the message in a channel which can be obtained by calling ReceiveChan
 type HttpTransport struct {
 	listenAddr string
 	outChan    chan string
 	server     *http.Server
 }
 
+// Response message that is used to respond to incoming http messages
 type Response struct {
 	Status string `json:"status"`
 	Err    string `json:"error"`
 }
 
+// NewHttpTransport returns an HttpTransport with the given options.
+// Options:
+// - addr: the address to listen for http connections for
 func NewHttpTransport(options *viper.Viper) *HttpTransport {
 	t := &HttpTransport{
 		listenAddr: options.GetString("addr"),
@@ -64,6 +70,7 @@ func (t *HttpTransport) respond(w http.ResponseWriter, r *Response) {
 	w.Write(respB)
 }
 
+// Handler function that receives all requests
 func (t *HttpTransport) Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -74,15 +81,17 @@ func (t *HttpTransport) Handler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	if err == nil {
 		// logger.Debug(fmt.Sprintf("Transport: Received message, %s", string(bodyBytes)))
-		t.outChan <- string(bodyBytes)
+		go func(msg []byte) { t.outChan <- string(msg) }(bodyBytes)
 	}
 	t.respond(w, &allOk)
 }
 
+// ReceiveChan returns the channel on which incoming messages are published
 func (t *HttpTransport) ReceiveChan() chan string {
 	return t.outChan
 }
 
+// Run start the http server
 func (t *HttpTransport) Run() {
 	logger.Debug(fmt.Sprintf("Starting server at: %s", t.listenAddr))
 	if err := t.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -90,6 +99,7 @@ func (t *HttpTransport) Run() {
 	}
 }
 
+// Stop stops the http server
 func (t *HttpTransport) Stop() {
 	sCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer func() {
@@ -103,14 +113,25 @@ func (t *HttpTransport) Stop() {
 	}
 }
 
+// RequestOption can be used to modify the request that is to be sent
 type RequestOption func(*http.Request)
 
+// JsonRequest sets the content type to application/json
 func JsonRequest() RequestOption {
 	return func(r *http.Request) {
 		r.Header.Set("Content-Type", "application/json")
 	}
 }
 
+// SendMsg sends a message to the specified address using the specified method
+// Returns the response if successful or returns error if the response was not 2xx
+func SendMsg(method, toAddr, msg string, options ...RequestOption) (string, *types.Error) {
+	t := &HttpTransport{}
+	return t.SendMsg(method, toAddr, msg, options...)
+}
+
+// SendMsg sends a message to the specified address using the specified method
+// Returns the response if successful or returns error if the response was not 2xx
 func (t *HttpTransport) SendMsg(method, toAddr, msg string, options ...RequestOption) (string, *types.Error) {
 	client := &http.Client{}
 	req, err := http.NewRequest(method, "http://"+toAddr, bytes.NewBuffer([]byte(msg)))
@@ -134,7 +155,8 @@ func (t *HttpTransport) SendMsg(method, toAddr, msg string, options ...RequestOp
 		)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusOK {
+	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if statusOK {
 		bodyB, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return "", types.NewError(

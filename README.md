@@ -1,6 +1,8 @@
 # scheduler
 Abstract framework to work with intercepted messages of a distributed system. Provides the necessary abstractions to instrument algorithms and define strategies for testing the implementations.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/ds-test-framework/scheduler.svg)](https://pkg.go.dev/github.com/ds-test-framework/scheduler)
+
 ## Build
 
 Run `go install checker.go` while in directory `cmd/checker` for the main binary.

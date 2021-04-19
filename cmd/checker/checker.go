@@ -65,9 +65,12 @@ func (c *Checker) Run(ctx context.Context) {
 
 func (c *Checker) run() {
 
-	ok := c.driver.Ready()
-	if !ok {
+	ok, err := c.driver.Ready()
+	if err != nil {
 		c.Stop()
+		return
+	}
+	if !ok {
 		return
 	}
 	logger.Debug("Driver ready")
@@ -97,7 +100,7 @@ func (c *Checker) run() {
 }
 
 func (c *Checker) Stop() {
-	c.stopChan <- true
+	close(c.stopChan)
 	c.driver.Destroy()
 	c.engine.Stop()
 	c.engineManager.Stop()

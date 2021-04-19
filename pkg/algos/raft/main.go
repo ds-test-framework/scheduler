@@ -74,8 +74,8 @@ func (d *RaftDriver) Init() {
 	go d.poll()
 }
 
-func (d *RaftDriver) Ready() bool {
-	return true
+func (d *RaftDriver) Ready() (bool, *types.Error) {
+	return true, nil
 }
 
 func (d *RaftDriver) InChan() chan *types.MessageWrapper {

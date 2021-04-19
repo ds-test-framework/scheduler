@@ -95,7 +95,7 @@ func (t *HttpTransport) ReceiveChan() chan string {
 func (t *HttpTransport) Run() {
 	logger.Debug(fmt.Sprintf("Starting server at: %s", t.listenAddr))
 	if err := t.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Fatal("Could not start server")
+		logger.Fatal(fmt.Sprintf("Could not start server: %s", err.Error()))
 	}
 }
 

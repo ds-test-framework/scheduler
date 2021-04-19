@@ -126,16 +126,16 @@ func (m *CommonDriver) waitForAllPeers() *types.Error {
 	return nil
 }
 
-func (m *CommonDriver) Ready() bool {
+func (m *CommonDriver) Ready() (bool, *types.Error) {
 	for {
 		select {
 		case <-m.stopCh:
-			return false
+			return false, nil
 		default:
 		}
 
 		if m.peers.Count() == m.totalPeers {
-			return true
+			return true, nil
 		}
 	}
 }

@@ -30,5 +30,5 @@ type AlgoDriver interface {
 
 	// Ready called once before the scheduler is run. Should block till the implementation is ready and return true.
 	// If false is returned then the scheduler stops
-	Ready() bool
+	Ready() (bool, *Error)
 }

@@ -14,7 +14,7 @@
         "algo": "tendermint",
         "num_replicas": 4,
         "transport": {
-            "addr": "192.168.0.5:7074"
+            "addr": "192.168.0.4:7074"
         }
     }
 }

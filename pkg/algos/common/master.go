@@ -162,7 +162,7 @@ func (m *CommonDriver) StartRun(run int) (*types.RunObj, *types.Error) {
 	runObj := &types.RunObj{
 		Ch: make(chan bool, 1),
 	}
-	m.restartPeers()
+	// m.restartPeers()
 
 	m.runLock.Lock()
 	m.run = run
@@ -204,7 +204,7 @@ func (m *CommonDriver) checkPeer(peer *Replica) {
 }
 
 func (m *CommonDriver) handleIncoming(msg string) {
-	// logger.Debug("Received message: " + msg)
+	logger.Debug("Received message: " + msg)
 	r, err := unmarshal(msg)
 	if err != nil {
 		logger.Debug("Error unmarshalling message: " + err.Error())
@@ -301,6 +301,7 @@ func (m *CommonDriver) sendPeerMsg(peer *Replica, msg *InterceptedMessage) {
 	if err != nil {
 		return
 	}
+	logger.Debug(fmt.Sprintf("Sending peer message: %s", string(b)))
 	m.transport.SendMsg(http.MethodPost, peer.Addr+"/message", string(b), transport.JsonRequest())
 }
 

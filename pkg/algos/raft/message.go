@@ -58,6 +58,7 @@ func UnmarshalMessage(message string) (*types.Message, *types.Error) {
 		types.ReplicaID(strconv.Itoa(msg.To)),
 		weight,
 		timeout,
+		[]byte(msg.M.Message),
 	), nil
 
 }

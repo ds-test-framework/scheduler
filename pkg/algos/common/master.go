@@ -204,7 +204,7 @@ func (m *CommonDriver) checkPeer(peer *Replica) {
 }
 
 func (m *CommonDriver) handleIncoming(msg string) {
-	logger.Debug("Received message: " + msg)
+	// logger.Debug("Received message: " + msg)
 	r, err := unmarshal(msg)
 	if err != nil {
 		logger.Debug("Error unmarshalling message: " + err.Error())
@@ -230,15 +230,15 @@ func (m *CommonDriver) handleIncoming(msg string) {
 				// logger.Debug("Sending message to engine: " + msg)
 				m.toEngine <- &types.MessageWrapper{
 					Run: run,
-					Msg: &types.Message{
-						Type:    iMsg.T,
-						From:    types.ReplicaID(iMsg.From),
-						To:      types.ReplicaID(iMsg.To),
-						ID:      iMsg.ID,
-						Msg:     []byte(iMsg.Msg),
-						Timeout: false,
-						Weight:  0,
-					},
+					Msg: types.NewMessage(
+						iMsg.T,
+						iMsg.ID,
+						types.ReplicaID(iMsg.From),
+						types.ReplicaID(iMsg.To),
+						0,
+						false,
+						[]byte(iMsg.Msg),
+					),
 				}
 			}()
 		} else {
@@ -261,15 +261,15 @@ func (m *CommonDriver) handleIncoming(msg string) {
 		go func() {
 			m.toEngine <- &types.MessageWrapper{
 				Run: run,
-				Msg: &types.Message{
-					Type:    r.Timeout.Type,
-					ID:      strconv.Itoa(id),
-					From:    types.ReplicaID(r.Timeout.Peer),
-					To:      types.ReplicaID(r.Timeout.Peer),
-					Msg:     []byte{},
-					Weight:  r.Timeout.Duration,
-					Timeout: true,
-				},
+				Msg: types.NewMessage(
+					r.Timeout.Type,
+					strconv.Itoa(id),
+					types.ReplicaID(r.Timeout.Peer),
+					types.ReplicaID(r.Timeout.Peer),
+					r.Timeout.Duration,
+					true,
+					[]byte{},
+				),
 			}
 		}()
 	}
@@ -301,7 +301,7 @@ func (m *CommonDriver) sendPeerMsg(peer *Replica, msg *InterceptedMessage) {
 	if err != nil {
 		return
 	}
-	logger.Debug(fmt.Sprintf("Sending peer message: %s", string(b)))
+	// logger.Debug(fmt.Sprintf("Sending peer message: %s", string(b)))
 	m.transport.SendMsg(http.MethodPost, peer.Addr+"/message", string(b), transport.JsonRequest())
 }
 

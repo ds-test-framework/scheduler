@@ -100,10 +100,11 @@ func (c *Checker) run() {
 }
 
 func (c *Checker) Stop() {
-	close(c.stopChan)
-	c.driver.Destroy()
+	logger.Debug("Stopping checker")
 	c.engine.Stop()
 	c.engineManager.Stop()
+	c.driver.Destroy()
+	close(c.stopChan)
 }
 
 func main() {
@@ -116,7 +117,6 @@ func main() {
 	go func() {
 		oscall := <-termCh
 		log.Printf("Received syscall: %#v", oscall)
-		logger.Destroy()
 		cancel()
 	}()
 
@@ -138,4 +138,6 @@ func main() {
 
 	checker := NewChecker(config)
 	checker.Run(ctx)
+
+	logger.Destroy()
 }

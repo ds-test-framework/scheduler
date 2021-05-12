@@ -18,5 +18,10 @@ func (w *WorkloadInjector) SetPeerStore(p *common.PeerStore) {
 }
 
 func (w *WorkloadInjector) InjectWorkLoad() *types.Error {
+	// resp, err := transport.SendMsg(http.MethodGet, "localhost:26657/broadcast_tx_commit?tx=\"one=two\"", "")
+	// if err != nil {
+	// 	return err
+	// }
+	// logger.Debug(fmt.Sprintf("Tendermint workload resp: %s", resp))
 	return nil
 }

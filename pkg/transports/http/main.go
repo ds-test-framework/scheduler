@@ -33,6 +33,7 @@ type HttpTransport struct {
 	listenAddr string
 	outChan    chan string
 	server     *http.Server
+	mux        *http.ServeMux
 }
 
 // Response message that is used to respond to incoming http messages
@@ -45,12 +46,14 @@ type Response struct {
 // Options:
 // - addr: the address to listen for http connections for
 func NewHttpTransport(options *viper.Viper) *HttpTransport {
+
+	mux := http.NewServeMux()
+
 	t := &HttpTransport{
 		listenAddr: options.GetString("addr"),
 		outChan:    make(chan string, 10),
+		mux:        mux,
 	}
-
-	mux := http.NewServeMux()
 	mux.HandleFunc("/", t.Handler)
 
 	t.server = &http.Server{
@@ -59,6 +62,10 @@ func NewHttpTransport(options *viper.Viper) *HttpTransport {
 	}
 	return t
 
+}
+
+func (t *HttpTransport) AddHandler(route string, handler func(http.ResponseWriter, *http.Request)) {
+	t.mux.HandleFunc(route, handler)
 }
 
 func (t *HttpTransport) respond(w http.ResponseWriter, r *Response) {

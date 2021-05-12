@@ -88,7 +88,7 @@ type Message struct {
 	lock         *sync.Mutex `json:"-"`
 }
 
-func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool) *Message {
+func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool, msg []byte) *Message {
 	return &Message{
 		Type:         t,
 		ID:           id,
@@ -96,6 +96,7 @@ func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool) *Message 
 		To:           to,
 		Weight:       w,
 		Timeout:      timeout,
+		Msg:          msg,
 		SendEvent:    0,
 		ReceiveEvent: 0,
 		lock:         new(sync.Mutex),
@@ -148,4 +149,27 @@ func (m *Message) Clone() *Message {
 type MessageWrapper struct {
 	Run int
 	Msg *Message
+}
+
+func (m *MessageWrapper) Clone() *MessageWrapper {
+	return &MessageWrapper{
+		Run: m.Run,
+		Msg: m.Msg.Clone(),
+	}
+}
+
+type Replica struct {
+	ID    ReplicaID              `json:"id"`
+	Addr  string                 `json:"addr"`
+	Info  map[string]interface{} `json:"info,omitempty"`
+	Ready bool                   `json:"ready"`
+}
+
+func (r *Replica) Clone() *Replica {
+	return &Replica{
+		ID:    r.ID,
+		Addr:  r.Addr,
+		Info:  r.Info,
+		Ready: r.Ready,
+	}
 }

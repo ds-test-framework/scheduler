@@ -7,12 +7,8 @@ type StrategyEngine interface {
 	Reset()
 
 	// Run is called once to start the engine
-	Run() *Error
+	Start() *Error
 
 	// Stop is called once at the end of testing
 	Stop()
-
-	// SetChannels is called with the incoming channel and outgoing channel respectively
-	// The Engine should use these message channels to reveive from and send to
-	SetChannels(chan *MessageWrapper, chan *MessageWrapper)
 }

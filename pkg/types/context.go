@@ -3,20 +3,19 @@ package types
 import (
 	"sync"
 
+	"github.com/ds-test-framework/scheduler/pkg/log"
 	"github.com/spf13/viper"
 )
 
 type ContextEvent struct {
 	Type    ContextEventType
-	Run     int
-	Message *Message
+	Message *MessageWrapper
 	Replica *Replica
 }
 
 func (c ContextEvent) Clone() ContextEvent {
 	return ContextEvent{
 		Type:    c.Type,
-		Run:     c.Run,
 		Message: c.Message.Clone(),
 		Replica: c.Replica.Clone(),
 	}
@@ -28,42 +27,48 @@ const (
 	InterceptedMessage ContextEventType = "InterceptedMessage"
 	NewReplica         ContextEventType = "NewReplica"
 	EnabledMessage     ContextEventType = "EnabledMessage"
+	ScheduledMessage   ContextEventType = "ScheduledMessage"
 )
 
+func (e ContextEventType) String() string {
+	return string(e)
+}
+
 // Should have all the channels and subscribers not the actual instances of driver, engine
+// Should not run its own go routines, Just outputting on channels
 type Context struct {
-	fromEngine chan *MessageWrapper
-	toEngine   chan *MessageWrapper
-
-	messages chan *Message
-
 	Replicas     *ReplicaStore
-	StateUpdates *RunStore
-	Logs         *RunStore
+	StateUpdates *StateUpdatesStore
+	Logs         *LogStore
 
-	subscribers map[ContextEventType][]chan ContextEvent
+	subscribers     map[ContextEventType][]chan ContextEvent
+	subscribersLock *sync.Mutex
 
 	run     int
 	runLock *sync.Mutex
 
-	Config *viper.Viper
+	config *viper.Viper
+
+	Logger *log.Logger
 }
 
-func NewContext(config *viper.Viper) *Context {
+func NewContext(config *viper.Viper, logger *log.Logger) *Context {
 	return &Context{
-		Config:       config,
-		StateUpdates: NewRunStore(),
-		Logs:         NewRunStore(),
-		Replicas:     NewReplicaStore(),
-		fromEngine:   make(chan *MessageWrapper, 10),
-		toEngine:     make(chan *MessageWrapper, 10),
-
-		messages:    make(chan *Message, 10),
-		subscribers: make(map[ContextEventType][]chan ContextEvent),
+		config:          config,
+		StateUpdates:    NewStateUpdatesStore(),
+		Logs:            NewLogStore(),
+		Replicas:        NewReplicaStore(),
+		subscribers:     make(map[ContextEventType][]chan ContextEvent),
+		subscribersLock: new(sync.Mutex),
 
 		run:     0,
 		runLock: new(sync.Mutex),
+		Logger:  logger,
 	}
+}
+
+func (c *Context) Config(sub string) *viper.Viper {
+	return c.config.Sub(sub)
 }
 
 func (c *Context) SetRun(run int) {
@@ -75,6 +80,8 @@ func (c *Context) SetRun(run int) {
 }
 
 func (c *Context) Subscribe(event ContextEventType) chan ContextEvent {
+	c.subscribersLock.Lock()
+	defer c.subscribersLock.Unlock()
 	_, ok := c.subscribers[event]
 	if !ok {
 		c.subscribers[event] = make([]chan ContextEvent, 0)
@@ -86,15 +93,19 @@ func (c *Context) Subscribe(event ContextEventType) chan ContextEvent {
 }
 
 func (c *Context) NewMessage(msg *Message) {
-	go func() {
-		c.messages <- msg
-	}()
-}
+	c.runLock.Lock()
+	run := c.run
+	c.runLock.Unlock()
 
-func (c *Context) SendToEngine(msg *MessageWrapper) {
-	go func() {
-		c.toEngine <- msg
-	}()
+	msgW := &MessageWrapper{
+		Run: run,
+		Msg: msg,
+	}
+
+	c.dispatchEvent(ContextEvent{
+		Type:    InterceptedMessage,
+		Message: msgW,
+	})
 }
 
 func (c *Context) NewReplica(r *Replica) {
@@ -106,11 +117,48 @@ func (c *Context) NewReplica(r *Replica) {
 	})
 }
 
+func (c *Context) MarkMessage(msg *MessageWrapper) {
+	c.runLock.Lock()
+	run := c.run
+	c.runLock.Unlock()
+
+	if msg.Run != run {
+		return
+	}
+
+	c.dispatchEvent(ContextEvent{
+		Type:    EnabledMessage,
+		Message: msg,
+	})
+}
+
+func (c *Context) ScheduleMessage(msg *MessageWrapper) {
+	c.runLock.Lock()
+	run := c.run
+	c.runLock.Unlock()
+
+	if msg.Run != run {
+		return
+	}
+
+	c.dispatchEvent(ContextEvent{
+		Type:    ScheduledMessage,
+		Message: msg,
+	})
+}
+
 func (c *Context) dispatchEvent(e ContextEvent) {
+
+	c.Logger.With(map[string]string{
+		"event_type": e.Type.String(),
+	}).Debug("Dispatching event")
+
+	c.subscribersLock.Lock()
 	chans, ok := c.subscribers[e.Type]
 	if !ok {
 		return
 	}
+	c.subscribersLock.Unlock()
 
 	for _, c := range chans {
 		go func(e ContextEvent, ch chan ContextEvent) {

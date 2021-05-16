@@ -12,9 +12,9 @@
     "driver": {
         "type": "common",
         "algo": "tendermint",
-        "num_replicas": 4,
-        "transport": {
-            "addr": "192.168.0.4:7074"
-        }
+        "num_replicas": 4
+    },
+    "transport": {
+        "addr": "192.168.0.6:7074"
     }
 }

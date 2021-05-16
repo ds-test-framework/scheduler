@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ds-test-framework/scheduler/pkg/logger"
+	"github.com/ds-test-framework/scheduler/pkg/log"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/gogo/protobuf/proto"
 	tmsg "github.com/tendermint/tendermint/proto/tendermint/consensus"
@@ -13,23 +13,31 @@ import (
 
 // NopScheduler does nothing. Just returns the incoming message in the outgoing channel
 type TTestScheduler struct {
-	inChan  chan *types.MessageWrapper
-	outChan chan *types.MessageWrapper
-	stopCh  chan bool
+	inChan chan types.ContextEvent
+	ctx    *types.Context
+	stopCh chan bool
 
 	messageTypes map[string]int
 	mLock        *sync.Mutex
+
+	logger *log.Logger
 
 	filters []Filter
 }
 
 // NewTTestScheduler returns a new TTestScheduler
-func NewTTestScheduler() *TTestScheduler {
+func NewTTestScheduler(ctx *types.Context) *TTestScheduler {
 	return &TTestScheduler{
 		stopCh:       make(chan bool, 1),
 		messageTypes: make(map[string]int),
 		mLock:        new(sync.Mutex),
 		filters:      []Filter{NewBlockNAllow("BlockPart", 5, 10)},
+
+		ctx:    ctx,
+		inChan: ctx.Subscribe(types.ScheduledMessage),
+		logger: ctx.Logger.With(map[string]string{
+			"service": "TTestScheduler",
+		}),
 	}
 }
 
@@ -37,36 +45,36 @@ func NewTTestScheduler() *TTestScheduler {
 func (n *TTestScheduler) Reset() {
 }
 
-// Run implements StrategyEngine
-func (n *TTestScheduler) Run() *types.Error {
-	logger.Debug("Starting TTestScheduler")
+// Start implements StrategyEngine
+func (n *TTestScheduler) Start() *types.Error {
+	n.logger.Debug("Starting TTestScheduler")
 	go n.poll()
 	return nil
 }
 
 // Stop implements StrategyEngine
 func (n *TTestScheduler) Stop() {
-	logger.Debug("Stopping TTestScheduler")
+	n.logger.Debug("Stopping TTestScheduler")
 	n.mLock.Lock()
-	logger.Debug(fmt.Sprintf("Message types received: %#v", n.messageTypes))
+	n.logger.Debug(fmt.Sprintf("Message types received: %#v", n.messageTypes))
 	n.mLock.Unlock()
 	close(n.stopCh)
-}
-
-// SetChannels implements StrategyEngine
-func (n *TTestScheduler) SetChannels(inChan chan *types.MessageWrapper, outChan chan *types.MessageWrapper) {
-	n.inChan = inChan
-	n.outChan = outChan
 }
 
 func (n *TTestScheduler) poll() {
 	for {
 		select {
-		case m := <-n.inChan:
+		case event := <-n.inChan:
+			n.logger.With(map[string]string{
+				"event_type":        event.Type.String(),
+				"scheduled_message": fmt.Sprintf("%#v", event.Message.Msg),
+				"run":               fmt.Sprintf("%d", event.Message.Run),
+			}).Debug("Received message")
+			m := event.Message
 			cMsg, err := unmarshal(m.Msg.Msg)
 			ok := true
 			if err == nil {
-				// logger.Debug(fmt.Sprintf("Message on channel id: %d, %s", cMsg.ChannelID, cMsg.MsgB))
+				// n.logger.Debug(fmt.Sprintf("Message on channel id: %d, %s", cMsg.ChannelID, cMsg.MsgB))
 				n.mLock.Lock()
 				n.messageTypes[cMsg.Type] = n.messageTypes[cMsg.Type] + 1
 				n.mLock.Unlock()
@@ -78,11 +86,11 @@ func (n *TTestScheduler) poll() {
 					}
 				}
 			} else {
-				logger.Debug("Error unmarshalling: " + err.Error())
+				n.logger.Debug("Error unmarshalling: " + err.Error())
 			}
 			if ok {
 				go func(m *types.MessageWrapper) {
-					n.outChan <- m
+					n.ctx.MarkMessage(m)
 				}(m)
 			}
 		case <-n.stopCh:
@@ -111,7 +119,7 @@ func unmarshal(m []byte) (*ControllerMsgEnvelop, error) {
 	msg.Reset()
 
 	if err := proto.Unmarshal(cMsg.MsgB, msg); err != nil {
-		logger.Debug("Error unmarshalling")
+		// log.Debug("Error unmarshalling")
 		cMsg.Type = "None"
 		cMsg.Msg = nil
 		return &cMsg, nil
@@ -148,6 +156,6 @@ func unmarshal(m []byte) (*ControllerMsgEnvelop, error) {
 		cMsg.Type = "None"
 	}
 
-	logger.Debug(fmt.Sprintf("Received message from: %s, with contents: %s", cMsg.From, cMsg.Msg.String()))
+	// log.Debug(fmt.Sprintf("Received message from: %s, with contents: %s", cMsg.From, cMsg.Msg.String()))
 	return &cMsg, err
 }

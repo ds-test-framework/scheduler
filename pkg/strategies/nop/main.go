@@ -6,15 +6,17 @@ import (
 
 // NopScheduler does nothing. Just returns the incoming message in the outgoing channel
 type NopScheduler struct {
-	inChan  chan *types.MessageWrapper
-	outChan chan *types.MessageWrapper
-	stopCh  chan bool
+	inChan chan types.ContextEvent
+	stopCh chan bool
+	ctx    *types.Context
 }
 
 // NewNopScheduler returns a new NopScheduler
-func NewNopScheduler() *NopScheduler {
+func NewNopScheduler(ctx *types.Context) *NopScheduler {
 	return &NopScheduler{
 		stopCh: make(chan bool, 1),
+		ctx:    ctx,
+		inChan: ctx.Subscribe(types.ScheduledMessage),
 	}
 }
 
@@ -23,7 +25,7 @@ func (n *NopScheduler) Reset() {
 }
 
 // Run implements StrategyEngine
-func (n *NopScheduler) Run() *types.Error {
+func (n *NopScheduler) Start() *types.Error {
 	go n.poll()
 	return nil
 }
@@ -33,18 +35,13 @@ func (n *NopScheduler) Stop() {
 	close(n.stopCh)
 }
 
-// SetChannels implements StrategyEngine
-func (n *NopScheduler) SetChannels(inChan chan *types.MessageWrapper, outChan chan *types.MessageWrapper) {
-	n.inChan = inChan
-	n.outChan = outChan
-}
-
 func (n *NopScheduler) poll() {
 	for {
 		select {
-		case m := <-n.inChan:
+		case e := <-n.inChan:
+			m := e.Message
 			go func(m *types.MessageWrapper) {
-				n.outChan <- m
+				n.ctx.MarkMessage(m)
 			}(m)
 		case <-n.stopCh:
 			return

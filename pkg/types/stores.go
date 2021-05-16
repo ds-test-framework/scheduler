@@ -2,31 +2,58 @@ package types
 
 import "sync"
 
-type RunStore struct {
+type StateUpdatesStore struct {
 	curRun  int
 	updates map[int][]string
 
 	lock *sync.Mutex
 }
 
-func NewRunStore() *RunStore {
-	return &RunStore{
+func NewStateUpdatesStore() *StateUpdatesStore {
+	return &StateUpdatesStore{
 		curRun:  0,
 		updates: make(map[int][]string),
 		lock:    new(sync.Mutex),
 	}
 }
 
-func (s *RunStore) SetRun(i int) {
+func (s *StateUpdatesStore) SetRun(i int) {
 	s.lock.Lock()
 	s.curRun = i
 	s.updates[s.curRun] = make([]string, 0)
 	s.lock.Unlock()
 }
 
-func (s *RunStore) AddUpdate(state string) {
+func (s *StateUpdatesStore) AddUpdate(state string) {
 	s.lock.Lock()
 	s.updates[s.curRun] = append(s.updates[s.curRun], state)
+	s.lock.Unlock()
+}
+
+type LogStore struct {
+	curRun int
+	lock   *sync.Mutex
+	logs   map[int][]map[string]interface{}
+}
+
+func NewLogStore() *LogStore {
+	return &LogStore{
+		curRun: 0,
+		logs:   make(map[int][]map[string]interface{}),
+		lock:   new(sync.Mutex),
+	}
+}
+
+func (s *LogStore) SetRun(i int) {
+	s.lock.Lock()
+	s.curRun = i
+	s.logs[s.curRun] = make([]map[string]interface{}, 0)
+	s.lock.Unlock()
+}
+
+func (s *LogStore) AddUpdate(params map[string]interface{}) {
+	s.lock.Lock()
+	s.logs[s.curRun] = append(s.logs[s.curRun], params)
 	s.lock.Unlock()
 }
 

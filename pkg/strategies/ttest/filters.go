@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ds-test-framework/scheduler/pkg/logger"
+	"github.com/ds-test-framework/scheduler/pkg/log"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
@@ -55,7 +55,7 @@ func (m *CountTypeFilter) Test(msg *ControllerMsgEnvelop) bool {
 		count = m.count
 		m.countLock.Unlock()
 		if count > m.maxcount {
-			// logger.Debug(fmt.Sprintf("CountType filter count exceeded for type: %s", m.t))
+			// log.Debug(fmt.Sprintf("CountType filter count exceeded for type: %s", m.t))
 			return false
 		}
 	}
@@ -122,7 +122,7 @@ func (f *RandomPeerTypeFilter) Test(msg *ControllerMsgEnvelop) bool {
 			count = f.count
 			f.countLock.Unlock()
 			if count > f.maxcount {
-				logger.Debug(fmt.Sprintf("Count exceeded for peer: %s", f.peer))
+				log.Debug(fmt.Sprintf("Count exceeded for peer: %s", f.peer))
 				return false
 			}
 			return true

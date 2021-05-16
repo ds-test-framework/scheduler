@@ -9,17 +9,11 @@ type RunObj struct {
 // AlgoDriver defines an interface for interacting with an algorithm implementation.
 // Instrumenting your algorithm would mean implementing this interface in `pkg/algo/<custom_algo>`
 type AlgoDriver interface {
-	// Init called once before starting the testing itertions.
-	Init()
+	// Start called once before starting the testing itertions.
+	Start()
 
-	// OutChan should return the channel which will contain the incoming intercepted messages.
-	OutChan() chan *MessageWrapper
-
-	// InChan should return the channel which listens for messages that are scheduled
-	InChan() chan *MessageWrapper
-
-	// Destroy called when stopping the scheduler
-	Destroy()
+	// Stop called when stopping the scheduler
+	Stop()
 
 	// StartRun is called at the start of every iteration and returns an RunObj or error if the run failed to start.
 	// If the run failed to start then the scheduler stops

@@ -1,56 +1,60 @@
-package main
+package checker
 
 import (
 	"context"
-	"flag"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/ds-test-framework/scheduler/pkg/algos"
-	"github.com/ds-test-framework/scheduler/pkg/logger"
+	"github.com/ds-test-framework/scheduler/pkg/algos/common"
+	"github.com/ds-test-framework/scheduler/pkg/apiserver"
+	"github.com/ds-test-framework/scheduler/pkg/log"
 	"github.com/ds-test-framework/scheduler/pkg/strategies"
 	"github.com/ds-test-framework/scheduler/pkg/types"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
-	root *string = flag.String("config", "", "Config path")
+	configPath string
+	verbose    bool
 )
 
 type Checker struct {
-	engine        types.StrategyEngine
-	driver        types.AlgoDriver
-	config        *viper.Viper
-	engineManager *strategies.EngineManager
-	stopChan      chan bool
+	engine    types.StrategyEngine
+	driver    types.AlgoDriver
+	ctx       *types.Context
+	apiServer *apiserver.APIServer
+	stopChan  chan bool
 }
 
-func NewChecker(c *viper.Viper) *Checker {
+func NewChecker(ctx *types.Context) *Checker {
 	checker := &Checker{
-		config:   c,
+		ctx:      ctx,
 		stopChan: make(chan bool, 2),
 	}
-	engine, err := strategies.GetStrategyEngine(c.Sub("engine"))
+	apiS := apiserver.NewAPIServer(ctx)
+	engine, err := strategies.GetStrategyEngine(ctx)
 	if err != nil {
-		logger.Fatal(err.Error())
+		log.Fatal(err.Error())
 	}
-	driver, err := algos.GetAlgoDriver(c.Sub("driver"))
+	workload, err := algos.GetWorkloadInjector(ctx)
 	if err != nil {
-		logger.Fatal(err.Error())
+		log.Fatal(err.Error())
 	}
-	engineManager := strategies.NewEngineManager(engine, driver.OutChan(), driver.InChan())
+	driver := common.NewCommonDriver(ctx, workload)
+
 	checker.engine = engine
 	checker.driver = driver
-	checker.engineManager = engineManager
+	checker.apiServer = apiS
 
-	driver.Init()
-	go engine.Run()
-	go engineManager.Run()
+	apiS.Start()
+	driver.Start()
+	go engine.Start()
 
 	return checker
 }
@@ -73,20 +77,21 @@ func (c *Checker) run() {
 	if !ok {
 		return
 	}
-	logger.Debug("Driver ready")
+	log.Debug("Driver ready")
 
-	runs := c.config.GetInt("run.runs")
-	runTime := c.config.GetInt("run.time")
+	config := c.ctx.Config("run")
+
+	runs := config.GetInt("run.runs")
+	runTime := config.GetInt("run.time")
 	for i := 0; i < runs; i++ {
-		c.engineManager.FlushChannels()
-		c.engineManager.SetRun(i)
+		c.ctx.SetRun(i)
 		runObj, err := c.driver.StartRun(i)
 		if err != nil {
 			c.Stop()
-			logger.Fatal("Error starting run: " + err.Error())
+			log.Fatal("Error starting run: " + err.Error())
 			return
 		}
-		logger.Debug(fmt.Sprintf("Started run %d", i))
+		log.Debug(fmt.Sprintf("Started run %d", i))
 		select {
 		case <-c.stopChan:
 			return
@@ -100,44 +105,59 @@ func (c *Checker) run() {
 }
 
 func (c *Checker) Stop() {
-	logger.Debug("Stopping checker")
+	log.Debug("Stopping checker")
+	c.apiServer.Stop()
 	c.engine.Stop()
-	c.engineManager.Stop()
-	c.driver.Destroy()
+	c.driver.Stop()
 	close(c.stopChan)
 }
 
-func main() {
+func CheckerCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "checker",
+		Short: "Checker tests a distributed system with the provided strategy",
+		Long:  "Framework to test arbitrary distributed system with a range of strategies to choose from",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			termCh := make(chan os.Signal, 1)
+			signal.Notify(termCh, os.Interrupt, syscall.SIGTERM)
 
-	termCh := make(chan os.Signal, 1)
-	signal.Notify(termCh, os.Interrupt, syscall.SIGTERM)
+			ctx, cancel := context.WithCancel(context.Background())
 
-	ctx, cancel := context.WithCancel(context.Background())
+			go func() {
+				oscall := <-termCh
+				log.Info(fmt.Sprintf("Received syscall: %s", oscall.String()))
+				cancel()
+			}()
 
-	go func() {
-		oscall := <-termCh
-		log.Printf("Received syscall: %#v", oscall)
-		cancel()
-	}()
+			viper.AddConfigPath(configPath)
+			runConfig := viper.New()
+			runConfig.SetDefault("runs", 1000)
+			runConfig.SetDefault("time", 5)
+			viper.SetDefault("run", runConfig)
 
-	flag.Parse()
+			err := viper.ReadInConfig()
+			if err != nil {
+				return errors.New("could not read config, check config path")
+			}
 
-	viper.AddConfigPath(*root)
-	runConfig := viper.New()
-	runConfig.SetDefault("runs", 1000)
-	runConfig.SetDefault("time", 5)
-	viper.SetDefault("run", runConfig)
+			config := viper.GetViper()
+			loglevel := "info"
+			if verbose {
+				loglevel = "debug"
+			}
+			log.Init(config.Sub("log"), loglevel)
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		logger.Fatal(err.Error())
+			context := types.NewContext(config, log.DefaultLogger)
+
+			checker := NewChecker(context)
+			checker.Run(ctx)
+
+			log.Destroy()
+			return nil
+		},
 	}
-
-	config := viper.GetViper()
-	logger.Init(config.Sub("log"))
-
-	checker := NewChecker(config)
-	checker.Run(ctx)
-
-	logger.Destroy()
+	cmd.PersistentFlags().StringVar(&configPath, "config", "", "Path to directory containing config file")
+	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Display verbose output")
+	cmd.MarkPersistentFlagRequired("config")
+	return cmd
 }

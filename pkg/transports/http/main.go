@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ds-test-framework/scheduler/pkg/logger"
+	logger "github.com/ds-test-framework/scheduler/pkg/log"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/spf13/viper"
 )
@@ -21,10 +21,10 @@ const (
 )
 
 var (
-	internalError    = Response{Err: "Internal server error"}
-	methodNotAllowed = Response{Err: "Method not allowed"}
+	InternalError    = Response{Err: "Internal server error"}
+	MethodNotAllowed = Response{Err: "Method not allowed"}
 
-	allOk = Response{Status: "ok"}
+	AllOk = Response{Status: "ok"}
 )
 
 // HttpTransport wrapps around net/http to start a server and to send http messages
@@ -48,13 +48,12 @@ type Response struct {
 func NewHttpTransport(options *viper.Viper) *HttpTransport {
 
 	mux := http.NewServeMux()
-
+	options.SetDefault("addr", "0.0.0.0:7074")
 	t := &HttpTransport{
 		listenAddr: options.GetString("addr"),
 		outChan:    make(chan string, 10),
 		mux:        mux,
 	}
-	mux.HandleFunc("/", t.Handler)
 
 	t.server = &http.Server{
 		Addr:    t.listenAddr,
@@ -63,7 +62,6 @@ func NewHttpTransport(options *viper.Viper) *HttpTransport {
 	return t
 
 }
-
 func (t *HttpTransport) AddHandler(route string, handler func(http.ResponseWriter, *http.Request)) {
 	t.mux.HandleFunc(route, handler)
 }
@@ -72,7 +70,7 @@ func (t *HttpTransport) respond(w http.ResponseWriter, r *Response) {
 	w.Header().Add("Content-Type", "application/json")
 	respB, err := json.Marshal(r)
 	if err != nil {
-		respB, _ = json.Marshal(internalError)
+		respB, _ = json.Marshal(InternalError)
 	}
 	w.Write(respB)
 }
@@ -81,7 +79,7 @@ func (t *HttpTransport) respond(w http.ResponseWriter, r *Response) {
 func (t *HttpTransport) Handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		t.respond(w, &methodNotAllowed)
+		t.respond(w, &MethodNotAllowed)
 		return
 	}
 	bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -90,12 +88,16 @@ func (t *HttpTransport) Handler(w http.ResponseWriter, r *http.Request) {
 		// logger.Debug(fmt.Sprintf("Transport: Received message, %s", string(bodyBytes)))
 		go func(msg []byte) { t.outChan <- string(msg) }(bodyBytes)
 	}
-	t.respond(w, &allOk)
+	t.respond(w, &AllOk)
 }
 
 // ReceiveChan returns the channel on which incoming messages are published
 func (t *HttpTransport) ReceiveChan() chan string {
 	return t.outChan
+}
+
+func (t *HttpTransport) Addr() string {
+	return t.listenAddr
 }
 
 // Run start the http server

@@ -1,20 +1,17 @@
 package tendermint
 
 import (
-	"github.com/ds-test-framework/scheduler/pkg/algos/common"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
 type WorkloadInjector struct {
-	peers *common.PeerStore
+	ctx *types.Context
 }
 
-func NewWorkloadInjector() *WorkloadInjector {
-	return &WorkloadInjector{}
-}
-
-func (w *WorkloadInjector) SetPeerStore(p *common.PeerStore) {
-	w.peers = p
+func NewWorkloadInjector(ctx *types.Context) *WorkloadInjector {
+	return &WorkloadInjector{
+		ctx: ctx,
+	}
 }
 
 func (w *WorkloadInjector) InjectWorkLoad() *types.Error {

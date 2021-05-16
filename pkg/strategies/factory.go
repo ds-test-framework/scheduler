@@ -1,8 +1,6 @@
 package strategies
 
 import (
-	"github.com/spf13/viper"
-
 	"github.com/ds-test-framework/scheduler/pkg/strategies/nop"
 	"github.com/ds-test-framework/scheduler/pkg/strategies/random"
 	"github.com/ds-test-framework/scheduler/pkg/strategies/timeout"
@@ -14,17 +12,17 @@ const (
 	ERR_INVALID_STRATEGY = "INVALID_STRATEGY"
 )
 
-func GetStrategyEngine(options *viper.Viper) (types.StrategyEngine, *types.Error) {
-	switch options.GetString("type") {
+func GetStrategyEngine(ctx *types.Context) (types.StrategyEngine, *types.Error) {
+	switch ctx.Config("engine").GetString("type") {
 	case "timeout":
-		return timeout.NewTimeoutEngine(options), nil
+		return timeout.NewTimeoutEngine(ctx), nil
 	case "random":
-		return random.NewRandomScheduler(), nil
+		return random.NewRandomScheduler(ctx), nil
 	case "no-op":
-		return nop.NewNopScheduler(), nil
+		return nop.NewNopScheduler(ctx), nil
 	// Tendermint testing scheduler
 	case "ttest":
-		return ttest.NewTTestScheduler(), nil
+		return ttest.NewTTestScheduler(ctx), nil
 	default:
 		return nil, types.NewError(
 			ERR_INVALID_STRATEGY,

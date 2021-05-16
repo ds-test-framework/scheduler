@@ -6,7 +6,6 @@ import (
 
 	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/ds-test-framework/scheduler/pkg/util"
-	"github.com/spf13/viper"
 )
 
 type pendingReceives struct {
@@ -72,8 +71,9 @@ func (p *pendingReceives) Reset() {
 // For every incoming message two events corresponding to the send/receive are created. The send is immediately added to the causal order maintained as a DAG.
 // Receive event is added only if there are no conflicts. Otherwise they are delayed by a randomly chosen time period
 type TimeoutEngine struct {
-	inChan       chan *types.MessageWrapper
-	outChan      chan *types.MessageWrapper
+	ctx *types.Context
+
+	inChan       chan types.ContextEvent
 	stopChan     chan bool
 	eventStore   *eventStore
 	messageStore *messageStore
@@ -92,10 +92,12 @@ type TimeoutEngine struct {
 }
 
 // NewTimeoutEngine returns a TimeoutEngine
-func NewTimeoutEngine(o *viper.Viper) *TimeoutEngine {
+func NewTimeoutEngine(ctx *types.Context) *TimeoutEngine {
+	o := ctx.Config("engine")
 	o.SetDefault("check_spuriousness", true)
 
 	e := &TimeoutEngine{
+		inChan:       ctx.Subscribe(types.ScheduledMessage),
 		stopChan:     make(chan bool, 3),
 		eventStore:   newEventStore(),
 		messageStore: newMessageStore(),
@@ -299,7 +301,7 @@ func (e *TimeoutEngine) dispatch(msgID string) {
 		return
 	}
 	// logger.Debug(fmt.Sprintf("Engine: Dispatching message: %#v", msg.Msg))
-	e.outChan <- msg
+	e.ctx.MarkMessage(msg)
 }
 
 func (e *TimeoutEngine) handleSendEvent(event *types.Event) {
@@ -354,17 +356,18 @@ func (e *TimeoutEngine) pollEventChan() {
 func (e *TimeoutEngine) pollInChan() {
 	for {
 		select {
-		case msgW := <-e.inChan:
+		case event := <-e.inChan:
+			msg := event.Message
 			e.msgMapLock.Lock()
-			e.msgMap[msgW.Msg.ID] = msgW
+			e.msgMap[msg.Msg.ID] = msg
 			e.msgMapLock.Unlock()
 
-			send, receive := e.createEvents(msgW.Msg)
-			e.messageStore.Set(msgW.Msg)
-			// logger.Debug(fmt.Sprintf("Engine: Received message: %#v", msgW.Msg))
+			send, receive := e.createEvents(msg.Msg)
+			e.messageStore.Set(msg.Msg)
+			// logger.Debug(fmt.Sprintf("Engine: Received message: %#v", msg.Msg))
 			e.eventChan <- send
 			// logger.Debug(fmt.Sprintf("Engine: Added send event to channel: %#v", send))
-			if msgW.Msg.Timeout {
+			if msg.Msg.Timeout {
 				go e.scheduleReceive(receive)
 			} else {
 				e.eventChan <- receive
@@ -377,8 +380,8 @@ func (e *TimeoutEngine) pollInChan() {
 	}
 }
 
-// Run implements StrategyEngine
-func (e *TimeoutEngine) Run() *types.Error {
+// Start implements StrategyEngine
+func (e *TimeoutEngine) Start() *types.Error {
 	go e.pollEventChan()
 	go e.pollInChan()
 	return nil
@@ -388,13 +391,4 @@ func (e *TimeoutEngine) Run() *types.Error {
 func (e *TimeoutEngine) Stop() {
 	e.stopChan <- true
 	e.stopChan <- true
-}
-
-// SetChannels implements StrategyEngine
-func (e *TimeoutEngine) SetChannels(
-	inChan chan *types.MessageWrapper,
-	outChan chan *types.MessageWrapper,
-) {
-	e.inChan = inChan
-	e.outChan = outChan
 }

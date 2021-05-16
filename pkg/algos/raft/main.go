@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ds-test-framework/scheduler/pkg/logger"
+	logger "github.com/ds-test-framework/scheduler/pkg/log"
 	transport "github.com/ds-test-framework/scheduler/pkg/transports/http"
 	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/spf13/viper"

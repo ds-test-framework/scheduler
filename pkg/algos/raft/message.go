@@ -59,6 +59,7 @@ func UnmarshalMessage(message string) (*types.Message, *types.Error) {
 		weight,
 		timeout,
 		[]byte(msg.M.Message),
+		true,
 	), nil
 
 }

@@ -80,15 +80,16 @@ type Message struct {
 	ID           string      `json:"id"`
 	From         ReplicaID   `json:"from"`
 	To           ReplicaID   `json:"to"`
-	Weight       int         `json:"weight"`
-	Timeout      bool        `json:"timeout"`
+	Weight       int         `json:"-"`
+	Timeout      bool        `json:"-"`
 	SendEvent    uint        `json:"-"`
 	ReceiveEvent uint        `json:"-"`
 	Msg          []byte      `json:"msg"`
+	Intercept    bool        `json:"intercept"`
 	lock         *sync.Mutex `json:"-"`
 }
 
-func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool, msg []byte) *Message {
+func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool, msg []byte, intercept bool) *Message {
 	return &Message{
 		Type:         t,
 		ID:           id,
@@ -99,6 +100,7 @@ func NewMessage(t, id string, from, to ReplicaID, w int, timeout bool, msg []byt
 		Msg:          msg,
 		SendEvent:    0,
 		ReceiveEvent: 0,
+		Intercept:    intercept,
 		lock:         new(sync.Mutex),
 	}
 }
@@ -130,6 +132,9 @@ func (m *Message) UpdateReceiveEvent(e uint) {
 }
 
 func (m *Message) Clone() *Message {
+	if m == nil {
+		return nil
+	}
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	return &Message{
@@ -141,6 +146,7 @@ func (m *Message) Clone() *Message {
 		Timeout:      m.Timeout,
 		SendEvent:    m.SendEvent,
 		ReceiveEvent: m.ReceiveEvent,
+		Intercept:    m.Intercept,
 		lock:         new(sync.Mutex),
 	}
 }
@@ -152,6 +158,9 @@ type MessageWrapper struct {
 }
 
 func (m *MessageWrapper) Clone() *MessageWrapper {
+	if m == nil {
+		return nil
+	}
 	return &MessageWrapper{
 		Run: m.Run,
 		Msg: m.Msg.Clone(),
@@ -166,10 +175,19 @@ type Replica struct {
 }
 
 func (r *Replica) Clone() *Replica {
+	if r == nil {
+		return nil
+	}
 	return &Replica{
 		ID:    r.ID,
 		Addr:  r.Addr,
 		Info:  r.Info,
 		Ready: r.Ready,
 	}
+}
+
+type Timeout struct {
+	Type     string    `json:"type"`
+	Duration int       `json:"duration"`
+	Replica  ReplicaID `json:"replica"`
 }

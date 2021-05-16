@@ -7,11 +7,11 @@ import (
 	"github.com/ds-test-framework/scheduler/pkg/types"
 )
 
-// msgStore 
+// msgStore
 type msgStore struct {
 	counters       map[types.ReplicaID]int
-	messages       map[string]*InterceptedMessage
-	toBeDispatched map[types.ReplicaID][]*InterceptedMessage
+	messages       map[string]*types.Message
+	toBeDispatched map[types.ReplicaID][]*types.Message
 
 	updateCh chan types.ReplicaID
 	lock     *sync.Mutex
@@ -20,14 +20,14 @@ type msgStore struct {
 func newMsgStore(updateCh chan types.ReplicaID) *msgStore {
 	return &msgStore{
 		counters:       make(map[types.ReplicaID]int),
-		messages:       make(map[string]*InterceptedMessage),
-		toBeDispatched: make(map[types.ReplicaID][]*InterceptedMessage),
+		messages:       make(map[string]*types.Message),
+		toBeDispatched: make(map[types.ReplicaID][]*types.Message),
 		updateCh:       updateCh,
 		lock:           new(sync.Mutex),
 	}
 }
 
-func (m *msgStore) Add(msg *InterceptedMessage) {
+func (m *msgStore) Add(msg *types.Message) {
 	m.lock.Lock()
 	m.messages[msg.ID] = msg
 	m.lock.Unlock()
@@ -46,7 +46,7 @@ func (m *msgStore) Mark(msgID string) {
 		m.counters[msg.To] += 1
 		_, ok = m.toBeDispatched[msg.To]
 		if !ok {
-			m.toBeDispatched[msg.To] = make([]*InterceptedMessage, 0)
+			m.toBeDispatched[msg.To] = make([]*types.Message, 0)
 		}
 		m.toBeDispatched[msg.To] = append(m.toBeDispatched[msg.To], msg)
 		go func() {
@@ -66,13 +66,13 @@ func (m *msgStore) Count(p types.ReplicaID) int {
 	return count
 }
 
-func (m *msgStore) Fetch(p types.ReplicaID, limit int) ([]*InterceptedMessage, int) {
+func (m *msgStore) Fetch(p types.ReplicaID, limit int) ([]*types.Message, int) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	count, ok := m.counters[p]
 	if !ok {
-		return make([]*InterceptedMessage, 0), 0
+		return make([]*types.Message, 0), 0
 	}
 
 	var remaining int
@@ -89,7 +89,7 @@ func (m *msgStore) Fetch(p types.ReplicaID, limit int) ([]*InterceptedMessage, i
 	return result, remaining
 }
 
-func (m *msgStore) FetchOne(p types.ReplicaID) (*InterceptedMessage, error) {
+func (m *msgStore) FetchOne(p types.ReplicaID) (*types.Message, error) {
 	res, _ := m.Fetch(p, 1)
 	if len(res) == 0 {
 		return nil, errors.New("no messages for peer")
@@ -109,49 +109,6 @@ func (m *msgStore) Reset() {
 	defer m.lock.Unlock()
 
 	m.counters = make(map[types.ReplicaID]int)
-	m.toBeDispatched = make(map[types.ReplicaID][]*InterceptedMessage)
-	m.messages = make(map[string]*InterceptedMessage)
-}
-
-type PeerStore struct {
-	peers map[types.ReplicaID]*Replica
-	lock  *sync.Mutex
-}
-
-func NewPeerStore() *PeerStore {
-	return &PeerStore{
-		peers: make(map[types.ReplicaID]*Replica),
-		lock:  new(sync.Mutex),
-	}
-}
-
-func (s *PeerStore) AddPeer(p *Replica) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.peers[p.ID] = p
-}
-
-func (s *PeerStore) GetPeer(id types.ReplicaID) (p *Replica, ok bool) {
-	s.lock.Lock()
-	p, ok = s.peers[id]
-	s.lock.Unlock()
-	return
-}
-
-func (s *PeerStore) Count() int {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return len(s.peers)
-}
-
-func (s *PeerStore) Iter() []*Replica {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	peers := make([]*Replica, len(s.peers))
-	i := 0
-	for _, p := range s.peers {
-		peers[i] = p
-		i++
-	}
-	return peers
+	m.toBeDispatched = make(map[types.ReplicaID][]*types.Message)
+	m.messages = make(map[string]*types.Message)
 }

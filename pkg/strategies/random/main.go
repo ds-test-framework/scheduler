@@ -9,27 +9,21 @@ import (
 
 // RandomScheduler picks a random message from the current pool of messages
 type RandomScheduler struct {
-	inChan  chan *types.MessageWrapper
-	outChan chan *types.MessageWrapper
-	stopCh  chan bool
+	inChan chan types.ContextEvent
+	ctx    *types.Context
+	stopCh chan bool
 
 	msgMap map[string]*types.MessageWrapper
 	lock   *sync.Mutex
 }
 
 // NewRandomScheduler returns a RandomScheduler
-func NewRandomScheduler() *RandomScheduler {
+func NewRandomScheduler(ctx *types.Context) *RandomScheduler {
 	return &RandomScheduler{
 		stopCh: make(chan bool, 1),
 		msgMap: make(map[string]*types.MessageWrapper),
 		lock:   new(sync.Mutex),
 	}
-}
-
-// SetChannels implements StrategyEngine
-func (r *RandomScheduler) SetChannels(inChan chan *types.MessageWrapper, outChan chan *types.MessageWrapper) {
-	r.inChan = inChan
-	r.outChan = outChan
 }
 
 func (r *RandomScheduler) dispatch(msgID string) {
@@ -39,7 +33,7 @@ func (r *RandomScheduler) dispatch(msgID string) {
 	m, ok := r.msgMap[msgID]
 	if ok {
 		delete(r.msgMap, msgID)
-		r.outChan <- m
+		r.ctx.MarkMessage(m)
 	}
 }
 
@@ -89,7 +83,8 @@ func (r *RandomScheduler) scheduleMessages() {
 func (r *RandomScheduler) pollInChan() {
 	for {
 		select {
-		case m := <-r.inChan:
+		case e := <-r.inChan:
+			m := e.Message
 			r.lock.Lock()
 			r.msgMap[m.Msg.ID] = m
 			r.lock.Unlock()
@@ -99,8 +94,8 @@ func (r *RandomScheduler) pollInChan() {
 	}
 }
 
-// Run implements StrategyEngine
-func (r *RandomScheduler) Run() *types.Error {
+// Start implements StrategyEngine
+func (r *RandomScheduler) Start() *types.Error {
 	go r.pollInChan()
 	go r.scheduleMessages()
 	return nil

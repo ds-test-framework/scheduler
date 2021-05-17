@@ -74,7 +74,7 @@ func (n *TTestScheduler) poll() {
 			cMsg, err := unmarshal(m.Msg.Msg)
 			ok := true
 			if err == nil {
-				// n.logger.Debug(fmt.Sprintf("Message on channel id: %d, %s", cMsg.ChannelID, cMsg.MsgB))
+				n.logger.Info(fmt.Sprintf("Received message from: %s, with contents: %s", cMsg.From, cMsg.Msg.String()))
 				n.mLock.Lock()
 				n.messageTypes[cMsg.Type] = n.messageTypes[cMsg.Type] + 1
 				n.mLock.Unlock()

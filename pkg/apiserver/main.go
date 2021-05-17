@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -20,14 +21,6 @@ type APIServer struct {
 	counterLock *sync.Mutex
 
 	logger *log.Logger
-}
-
-type state struct {
-	State string `json:"state"`
-}
-
-type logM struct {
-	Params map[string]interface{} `json:"params"`
 }
 
 func NewAPIServer(ctx *types.Context) *APIServer {
@@ -107,7 +100,7 @@ func (srv *APIServer) HandleMessage(w http.ResponseWriter, r *http.Request) {
 		msg.To,
 		0,
 		false,
-		[]byte(msg.Msg),
+		msg.Msg,
 		msg.Intercept,
 	))
 	srv.respond(w, &transport.AllOk)
@@ -150,7 +143,7 @@ func (srv *APIServer) HandleReplica(w http.ResponseWriter, r *http.Request) {
 		srv.respond(w, &transport.InternalError)
 	}
 
-	srv.ctx.NewReplica(&replica)
+	srv.ctx.ReplicaUpdate(&replica)
 	srv.respond(w, &transport.AllOk)
 }
 
@@ -160,13 +153,18 @@ func (srv *APIServer) HandleStateUpdate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var s state
+	var s types.StateUpdate
 	err := json.Unmarshal(body, &s)
 	if err != nil {
 		srv.respond(w, &transport.InternalError)
 	}
 
-	srv.ctx.StateUpdates.AddUpdate(s.State)
+	srv.logger.With(map[string]string{
+		"state":   s.State,
+		"replica": string(s.Replica),
+	}).Debug("Received state update")
+
+	srv.ctx.StateUpdates.AddUpdate(&s)
 	srv.respond(w, &transport.AllOk)
 }
 
@@ -176,13 +174,18 @@ func (srv *APIServer) HandleLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var l logM
+	var l types.ReplicaLog
 	err := json.Unmarshal(body, &l)
 	if err != nil {
 		srv.respond(w, &transport.InternalError)
 	}
 
-	srv.ctx.Logs.AddUpdate(l.Params)
+	srv.logger.With(map[string]string{
+		"params":  fmt.Sprintf("%#v", l.Params),
+		"replica": string(l.Replica),
+	}).Debug("Received log")
+
+	srv.ctx.Logs.AddUpdate(&l)
 	srv.respond(w, &transport.AllOk)
 }
 

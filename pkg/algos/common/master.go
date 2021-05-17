@@ -43,6 +43,9 @@ type CommonDriver struct {
 
 	ctx    *types.Context
 	logger *log.Logger
+
+	ready     bool
+	readyLock *sync.Mutex
 }
 
 // NewCommonDriver constructs a CommonDriver
@@ -114,7 +117,7 @@ func (m *CommonDriver) Ready() (bool, *types.Error) {
 		default:
 		}
 
-		if m.ctx.Replicas.Count() == m.totalPeers {
+		if m.ctx.Replicas.NumReady() == m.totalPeers {
 			return true, nil
 		}
 	}
@@ -138,6 +141,8 @@ func (m *CommonDriver) StartRun(run int) (*types.RunObj, *types.Error) {
 	if err != nil {
 		return nil, err
 	}
+	m.msgStore.Reset()
+	// Need to reset messagepool here after calling restart on the replicas
 
 	runObj := &types.RunObj{
 		Ch: make(chan bool, 1),
@@ -183,21 +188,25 @@ func (m *CommonDriver) dispatchTimeout(to types.ReplicaID, t string) {
 // 	}
 // }
 
+func (m *CommonDriver) handleIncoming(event types.ContextEvent) {
+	m.logger.With(map[string]string{
+		"intercepted_message": fmt.Sprintf("%#v", event.Message.Msg),
+		"run":                 strconv.Itoa(event.Message.Run),
+	}).Debug("Received message")
+	msg := event.Message.Msg
+	m.msgStore.Add(msg)
+	if msg.Intercept {
+		m.ctx.ScheduleMessage(event.Message)
+	} else {
+		m.msgStore.Mark(msg.ID)
+	}
+}
+
 func (m *CommonDriver) poll() {
 	for {
 		select {
-		case req := <-m.messagesIn:
-			m.logger.With(map[string]string{
-				"intercepted_message": fmt.Sprintf("%#v", req.Message.Msg),
-				"run":                 strconv.Itoa(req.Message.Run),
-			}).Debug("Received message")
-			msg := req.Message.Msg
-			m.msgStore.Add(msg)
-			if msg.Intercept {
-				m.ctx.ScheduleMessage(req.Message)
-			} else {
-				m.msgStore.Mark(msg.ID)
-			}
+		case event := <-m.messagesIn:
+			go m.handleIncoming(event)
 		case e := <-m.fromEngine:
 			msg := e.Message.Msg
 			if msg.Timeout {

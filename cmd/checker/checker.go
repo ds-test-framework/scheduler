@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -71,6 +72,9 @@ func (c *Checker) run() {
 
 	ok, err := c.driver.Ready()
 	if err != nil {
+		log.With(map[string]string{
+			"error": err.Error(),
+		}).Error("Error with driver getting ready")
 		c.Stop()
 		return
 	}
@@ -80,15 +84,20 @@ func (c *Checker) run() {
 	log.Debug("Driver ready")
 
 	config := c.ctx.Config("run")
-
-	runs := config.GetInt("run.runs")
-	runTime := config.GetInt("run.time")
+	runs := config.GetInt("runs")
+	runTime := config.GetInt("time")
+	log.With(map[string]string{
+		"no_runs":   strconv.Itoa(runs),
+		"wait_time": strconv.Itoa(runTime),
+	}).Debug("Starting testing loop")
 	for i := 0; i < runs; i++ {
 		c.ctx.SetRun(i)
 		runObj, err := c.driver.StartRun(i)
 		if err != nil {
+			log.With(map[string]string{
+				"error": err.Error(),
+			}).Error("Error starting run")
 			c.Stop()
-			log.Fatal("Error starting run: " + err.Error())
 			return
 		}
 		log.Debug(fmt.Sprintf("Started run %d", i))

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ds-test-framework/scheduler/pkg/log"
@@ -25,7 +26,7 @@ type ContextEventType string
 
 const (
 	InterceptedMessage ContextEventType = "InterceptedMessage"
-	NewReplica         ContextEventType = "NewReplica"
+	ReplicaUpdate      ContextEventType = "ReplicaUpdate"
 	EnabledMessage     ContextEventType = "EnabledMessage"
 	ScheduledMessage   ContextEventType = "ScheduledMessage"
 )
@@ -102,17 +103,20 @@ func (c *Context) NewMessage(msg *Message) {
 		Msg: msg,
 	}
 
-	c.dispatchEvent(ContextEvent{
+	go c.dispatchEvent(ContextEvent{
 		Type:    InterceptedMessage,
 		Message: msgW,
 	})
 }
 
-func (c *Context) NewReplica(r *Replica) {
+func (c *Context) ReplicaUpdate(r *Replica) {
 	c.Replicas.AddReplica(r)
+	c.Logger.With(map[string]string{
+		"replica": fmt.Sprintf("%#v", r),
+	}).Debug("Updated replica")
 
 	go c.dispatchEvent(ContextEvent{
-		Type:    NewReplica,
+		Type:    ReplicaUpdate,
 		Replica: r,
 	})
 }
@@ -126,7 +130,7 @@ func (c *Context) MarkMessage(msg *MessageWrapper) {
 		return
 	}
 
-	c.dispatchEvent(ContextEvent{
+	go c.dispatchEvent(ContextEvent{
 		Type:    EnabledMessage,
 		Message: msg,
 	})
@@ -141,24 +145,24 @@ func (c *Context) ScheduleMessage(msg *MessageWrapper) {
 		return
 	}
 
-	c.dispatchEvent(ContextEvent{
+	go c.dispatchEvent(ContextEvent{
 		Type:    ScheduledMessage,
 		Message: msg,
 	})
 }
 
 func (c *Context) dispatchEvent(e ContextEvent) {
+	c.subscribersLock.Lock()
+	chans, ok := c.subscribers[e.Type]
+	c.subscribersLock.Unlock()
+
+	if !ok {
+		return
+	}
 
 	c.Logger.With(map[string]string{
 		"event_type": e.Type.String(),
 	}).Debug("Dispatching event")
-
-	c.subscribersLock.Lock()
-	chans, ok := c.subscribers[e.Type]
-	if !ok {
-		return
-	}
-	c.subscribersLock.Unlock()
 
 	for _, c := range chans {
 		go func(e ContextEvent, ch chan ContextEvent) {

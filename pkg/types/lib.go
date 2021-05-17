@@ -148,6 +148,7 @@ func (m *Message) Clone() *Message {
 		ReceiveEvent: m.ReceiveEvent,
 		Intercept:    m.Intercept,
 		lock:         new(sync.Mutex),
+		Msg:          m.Msg,
 	}
 }
 

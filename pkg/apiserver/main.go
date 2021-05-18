@@ -162,7 +162,7 @@ func (srv *APIServer) HandleStateUpdate(w http.ResponseWriter, r *http.Request) 
 	srv.logger.With(map[string]string{
 		"state":   s.State,
 		"replica": string(s.Replica),
-	}).Debug("Received state update")
+	}).Info("Received state update")
 
 	srv.ctx.StateUpdates.AddUpdate(&s)
 	srv.respond(w, &transport.AllOk)
@@ -183,7 +183,7 @@ func (srv *APIServer) HandleLog(w http.ResponseWriter, r *http.Request) {
 	srv.logger.With(map[string]string{
 		"params":  fmt.Sprintf("%#v", l.Params),
 		"replica": string(l.Replica),
-	}).Debug("Received log")
+	}).Info("Received log")
 
 	srv.ctx.Logs.AddUpdate(&l)
 	srv.respond(w, &transport.AllOk)

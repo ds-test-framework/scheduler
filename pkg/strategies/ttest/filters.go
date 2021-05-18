@@ -62,6 +62,38 @@ func (m *CountTypeFilter) Test(msg *ControllerMsgEnvelop) bool {
 	return true
 }
 
+// CountTypeFilter per peer
+type PeerTypeCountFilter struct {
+	peers map[string]*BlockNAllow
+	mtx   *sync.Mutex
+
+	start int
+	end   int
+	t     string
+}
+
+func NewPeerTypeCountFilter(t string, start, end int) *PeerTypeCountFilter {
+	return &PeerTypeCountFilter{
+		peers: make(map[string]*BlockNAllow),
+		mtx:   new(sync.Mutex),
+		t:     t,
+		start: start,
+		end:   end,
+	}
+}
+
+func (p *PeerTypeCountFilter) Test(msg *ControllerMsgEnvelop) bool {
+	p.mtx.Lock()
+	peerFilter, ok := p.peers[string(msg.To)]
+	if !ok {
+		peerFilter = NewBlockNAllow(p.t, p.start, p.end)
+		p.peers[string(msg.To)] = peerFilter
+	}
+	p.mtx.Unlock()
+
+	return peerFilter.Test(msg)
+}
+
 type PeerFilter struct {
 	peer    string
 	exclude bool
@@ -134,8 +166,7 @@ func (f *RandomPeerTypeFilter) Test(msg *ControllerMsgEnvelop) bool {
 }
 
 type BlockNAllow struct {
-	t    string
-	peer types.ReplicaID
+	t string
 
 	startCount int
 	endCount   int
@@ -147,7 +178,6 @@ type BlockNAllow struct {
 func NewBlockNAllow(t string, start, end int) *BlockNAllow {
 	return &BlockNAllow{
 		t:          t,
-		peer:       "",
 		startCount: start,
 		endCount:   end,
 		count:      0,
@@ -156,6 +186,46 @@ func NewBlockNAllow(t string, start, end int) *BlockNAllow {
 }
 
 func (b *BlockNAllow) Test(msg *ControllerMsgEnvelop) bool {
+	if msg.Type != b.t {
+		return true
+	}
+
+	b.countLock.Lock()
+	b.count = b.count + 1
+	count := b.count
+	b.countLock.Unlock()
+
+	if count <= b.startCount {
+		return true
+	} else if count <= b.endCount {
+		return false
+	}
+	return true
+}
+
+type RandomBlockNAllow struct {
+	t    string
+	peer types.ReplicaID
+
+	startCount int
+	endCount   int
+
+	count     int
+	countLock *sync.Mutex
+}
+
+func NewRandomBlockNAllow(t string, start, end int) *RandomBlockNAllow {
+	return &RandomBlockNAllow{
+		t:          t,
+		peer:       "",
+		startCount: start,
+		endCount:   end,
+		count:      0,
+		countLock:  new(sync.Mutex),
+	}
+}
+
+func (b *RandomBlockNAllow) Test(msg *ControllerMsgEnvelop) bool {
 	if b.peer == "" {
 		b.peer = msg.To
 	}

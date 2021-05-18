@@ -9,6 +9,7 @@ import (
 	"github.com/ds-test-framework/scheduler/pkg/types"
 	"github.com/gogo/protobuf/proto"
 	tmsg "github.com/tendermint/tendermint/proto/tendermint/consensus"
+	ttypes "github.com/tendermint/tendermint/proto/tendermint/types"
 )
 
 // NopScheduler does nothing. Just returns the incoming message in the outgoing channel
@@ -31,7 +32,7 @@ func NewTTestScheduler(ctx *types.Context) *TTestScheduler {
 		stopCh:       make(chan bool, 1),
 		messageTypes: make(map[string]int),
 		mLock:        new(sync.Mutex),
-		filters:      []Filter{NewBlockNAllow("BlockPart", 5, 10)},
+		filters:      []Filter{NewPeerTypeCountFilter("Prevote", 1, 6)}, //NewBlockNAllow("BlockPart", 5, 10)
 
 		ctx:    ctx,
 		inChan: ctx.Subscribe(types.ScheduledMessage),
@@ -56,7 +57,7 @@ func (n *TTestScheduler) Start() *types.Error {
 func (n *TTestScheduler) Stop() {
 	n.logger.Debug("Stopping TTestScheduler")
 	n.mLock.Lock()
-	n.logger.Debug(fmt.Sprintf("Message types received: %#v", n.messageTypes))
+	n.logger.Info(fmt.Sprintf("Message types received: %#v", n.messageTypes))
 	n.mLock.Unlock()
 	close(n.stopCh)
 }
@@ -145,7 +146,14 @@ func unmarshal(m []byte) (*ControllerMsgEnvelop, error) {
 			cMsg.Type = "Vote"
 			break
 		}
-		cMsg.Type = v.Vote.Type.String()
+		switch v.Vote.Type {
+		case ttypes.PrevoteType:
+			cMsg.Type = "Prevote"
+		case ttypes.PrecommitType:
+			cMsg.Type = "Precommit"
+		default:
+			cMsg.Type = "Vote"
+		}
 	case *tmsg.Message_HasVote:
 		cMsg.Type = "HasVote"
 	case *tmsg.Message_VoteSetMaj23:

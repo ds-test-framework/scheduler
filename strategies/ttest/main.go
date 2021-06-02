@@ -32,7 +32,7 @@ func NewTTestScheduler(ctx *types.Context) *TTestScheduler {
 		stopCh:       make(chan bool, 1),
 		messageTypes: make(map[string]int),
 		mLock:        new(sync.Mutex),
-		filters:      []Filter{NewRoundSkipFilter(ctx)}, // NewBlockNAllow("BlockPart", 5, 10)
+		filters:      []Filter{}, //NewRoundSkipFilter(ctx) NewBlockNAllow("BlockPart", 5, 10)
 
 		ctx:    ctx,
 		inChan: ctx.Subscribe(types.ScheduledMessage),

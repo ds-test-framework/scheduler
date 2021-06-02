@@ -43,7 +43,7 @@ func newTestDriver(ctx *types.Context) *testDriver {
 
 		curTestCase: nil,
 		mtx:         new(sync.Mutex),
-		logger:      ctx.Logger.With(map[string]string{"service": "test-driver"}),
+		logger:      ctx.Logger.With(map[string]interface{}{"service": "test-driver"}),
 	}
 	d.msgStore = common.NewMsgStore(d.dispatchCh)
 	return d
@@ -61,7 +61,7 @@ func (d *testDriver) Stop() {
 }
 
 func (d *testDriver) StartRun(t TestCase) {
-	d.logger.With(map[string]string{"testcase": t.Name()}).Debug("Setting up driver for test case")
+	d.logger.With(map[string]interface{}{"testcase": t.Name()}).Debug("Setting up driver for test case")
 
 	d.msgStore.Reset()
 	d.ctx.Replicas.ResetReady()
@@ -79,7 +79,7 @@ func (d *testDriver) StopRun() {
 	d.curTestCase = nil
 	d.mtx.Unlock()
 
-	d.logger.With(map[string]string{"testcase": t.Name()}).Debug("Tearing down driver for test case")
+	d.logger.With(map[string]interface{}{"testcase": t.Name()}).Debug("Tearing down driver for test case")
 }
 
 func (m *testDriver) Ready() bool {

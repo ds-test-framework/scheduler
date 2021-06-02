@@ -55,11 +55,15 @@ type Context struct {
 }
 
 func NewContext(config *viper.Viper, logger *log.Logger) *Context {
+	driverConfig := config.Sub("driver")
+	driverConfig.SetDefault("num_replicas", 4)
+	replicaSize := driverConfig.GetInt("num_replicas")
+
 	return &Context{
 		config:          config,
 		StateUpdates:    NewStateUpdatesStore(),
 		Logs:            NewLogStore(),
-		Replicas:        NewReplicaStore(),
+		Replicas:        NewReplicaStore(replicaSize),
 		IDGen:           util.NewIDGenerator(),
 		subscribers:     make(map[ContextEventType][]chan ContextEvent),
 		subscribersLock: new(sync.Mutex),
@@ -113,7 +117,7 @@ func (c *Context) Publish(t ContextEventType, data Clonable) {
 		return
 	}
 
-	c.Logger.With(map[string]string{
+	c.Logger.With(map[string]interface{}{
 		"event_type": t.String(),
 	}).Debug("Dispatching event")
 

@@ -55,12 +55,10 @@ type CommonDriver struct {
 // - transport: transport config options
 // - num_replicas: number of replicas that are used for testing
 func NewCommonDriver(ctx *types.Context, workloadInjector WorkloadInjector) *CommonDriver {
-	cfg := ctx.Config("driver")
-	cfg.SetDefault("num_replicas", 3)
 	n := &CommonDriver{
 		messagesIn:       ctx.Subscribe(types.InterceptedMessage),
 		fromEngine:       ctx.Subscribe(types.EnabledMessage),
-		totalPeers:       cfg.GetInt("num_replicas"),
+		totalPeers:       ctx.Replicas.Size(),
 		workloadInjector: workloadInjector,
 		stopCh:           make(chan bool),
 		updateCh:         make(chan types.ReplicaID, 2),
@@ -68,7 +66,7 @@ func NewCommonDriver(ctx *types.Context, workloadInjector WorkloadInjector) *Com
 		run:     0,
 		runLock: new(sync.Mutex),
 		ctx:     ctx,
-		logger: ctx.Logger.With(map[string]string{
+		logger: ctx.Logger.With(map[string]interface{}{
 			"service": "CommonDriver",
 		}),
 	}
@@ -195,14 +193,14 @@ func (m *CommonDriver) handleIncoming(event types.ContextEvent) {
 	}
 	msgW, ok := event.Data.(*types.MessageWrapper)
 	if !ok {
-		m.logger.With(map[string]string{
+		m.logger.With(map[string]interface{}{
 			"msg":        "invalid event data",
 			"event_type": event.Type.String(),
 		})
 		return
 	}
 
-	m.logger.With(map[string]string{
+	m.logger.With(map[string]interface{}{
 		"intercepted_message": fmt.Sprintf("%#v", msgW.Msg),
 		"run":                 strconv.Itoa(msgW.Run),
 	}).Debug("Received message")

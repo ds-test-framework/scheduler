@@ -61,7 +61,7 @@ func (c *Checker) run() {
 
 	ok, err := c.driver.Ready()
 	if err != nil {
-		log.With(map[string]string{
+		log.With(map[string]interface{}{
 			"error": err.Error(),
 		}).Error("Error with driver getting ready")
 		c.Stop()
@@ -75,7 +75,7 @@ func (c *Checker) run() {
 	config := c.ctx.Config("run")
 	runs := config.GetInt("runs")
 	runTime := config.GetInt("time")
-	log.With(map[string]string{
+	log.With(map[string]interface{}{
 		"no_runs":   strconv.Itoa(runs),
 		"wait_time": strconv.Itoa(runTime),
 	}).Debug("Starting testing loop")
@@ -83,7 +83,7 @@ func (c *Checker) run() {
 		c.ctx.SetRun(i)
 		runObj, err := c.driver.StartRun(i)
 		if err != nil {
-			log.With(map[string]string{
+			log.With(map[string]interface{}{
 				"error": err.Error(),
 			}).Error("Error starting run")
 			c.Stop()

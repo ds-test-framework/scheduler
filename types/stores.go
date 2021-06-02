@@ -110,14 +110,22 @@ func (s *LogStore) AddUpdate(l *ReplicaLog) {
 
 type ReplicaStore struct {
 	replicas map[ReplicaID]*Replica
+	size     int
 	lock     *sync.Mutex
 }
 
-func NewReplicaStore() *ReplicaStore {
+func NewReplicaStore(size int) *ReplicaStore {
 	return &ReplicaStore{
 		replicas: make(map[ReplicaID]*Replica),
 		lock:     new(sync.Mutex),
+		size:     size,
 	}
+}
+
+func (s *ReplicaStore) Size() int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.size
 }
 
 func (s *ReplicaStore) UpdateReplica(p *Replica) {

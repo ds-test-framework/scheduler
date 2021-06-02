@@ -76,7 +76,7 @@ func NewTestServer(config ServerConfig, testcases []TestCase) (*Server, error) {
 	log.Init(ctxConfig.Sub("log"), config.LogLevel)
 
 	if len(testcases) == 0 {
-		log.DefaultLogger.With(map[string]string{"service": "test-server"}).Info("No testcases to run, returning nil")
+		log.DefaultLogger.With(map[string]interface{}{"service": "test-server"}).Info("No testcases to run, returning nil")
 		return nil, errors.New("no test cases given")
 	}
 
@@ -86,7 +86,7 @@ func NewTestServer(config ServerConfig, testcases []TestCase) (*Server, error) {
 		TestCases: testcases,
 		driver:    newTestDriver(context),
 		apiServer: apiserver.NewAPIServer(context),
-		logger:    log.DefaultLogger.With(map[string]string{"service": "test-server"}),
+		logger:    log.DefaultLogger.With(map[string]interface{}{"service": "test-server"}),
 		ctx:       context,
 
 		resultMap: newResultMap(),
@@ -104,7 +104,7 @@ func (s *Server) Run() {
 	s.logger.Info("Starting server main loop")
 	for i, testCase := range s.TestCases {
 
-		logger := s.logger.With(map[string]string{"testcase": testCase.Name()})
+		logger := s.logger.With(map[string]interface{}{"testcase": testCase.Name()})
 
 		s.ctx.SetRun(i)
 		logger.Info("Starting test case")
@@ -131,7 +131,7 @@ func (s *Server) Run() {
 		err = testCase.Assert()
 		s.resultMap.add(testCase.Name(), err)
 		if err != nil {
-			logger.With(map[string]string{"error": err.Error()}).Info("Testcase failed")
+			logger.With(map[string]interface{}{"error": err.Error()}).Info("Testcase failed")
 			continue
 		}
 		logger.Info("Testcase succeded")

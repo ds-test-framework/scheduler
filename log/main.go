@@ -60,7 +60,7 @@ func Error(s string) {
 	DefaultLogger.Error(s)
 }
 
-func With(params map[string]string) *Logger {
+func With(params map[string]interface{}) *Logger {
 	return DefaultLogger.With(params)
 }
 
@@ -90,7 +90,7 @@ func (l *Logger) Error(s string) {
 	l.entry.Error(s)
 }
 
-func (l *Logger) With(params map[string]string) *Logger {
+func (l *Logger) With(params map[string]interface{}) *Logger {
 	fields := logrus.Fields{}
 	for k, v := range params {
 		fields[k] = v

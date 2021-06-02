@@ -32,11 +32,11 @@ func NewTTestScheduler(ctx *types.Context) *TTestScheduler {
 		stopCh:       make(chan bool, 1),
 		messageTypes: make(map[string]int),
 		mLock:        new(sync.Mutex),
-		filters:      []Filter{NewRoundSkipFilter(ctx)}, //NewBlockNAllow("BlockPart", 5, 10)
+		filters:      []Filter{NewRoundSkipFilter(ctx)}, // NewBlockNAllow("BlockPart", 5, 10)
 
 		ctx:    ctx,
 		inChan: ctx.Subscribe(types.ScheduledMessage),
-		logger: ctx.Logger.With(map[string]string{
+		logger: ctx.Logger.With(map[string]interface{}{
 			"service": "TTestScheduler",
 		}),
 	}
@@ -70,16 +70,16 @@ func (n *TTestScheduler) handleIncoming(event types.ContextEvent) {
 	if !ok {
 		return
 	}
-	n.logger.With(map[string]string{
-		"event_type":        event.Type.String(),
-		"scheduled_message": fmt.Sprintf("%#v", msg.Msg),
-		"run":               fmt.Sprintf("%d", msg.Run),
+	n.logger.With(map[string]interface{}{
+		"event_type": event.Type.String(),
+		"msg_id":     msg.Msg.ID,
+		"run":        fmt.Sprintf("%d", msg.Run),
 	}).Debug("Received message")
 	m := msg
 	cMsg, err := unmarshal(m.Msg.Msg)
 	ok = true
 	if err == nil {
-		// n.logger.Info(fmt.Sprintf("Received message from: %s, with contents: %s", cMsg.From, cMsg.Msg.String()))
+		n.logger.Debug(fmt.Sprintf("Received message from: %s, with contents: %s", cMsg.From, cMsg.Msg.String()))
 		n.mLock.Lock()
 		n.messageTypes[cMsg.Type] = n.messageTypes[cMsg.Type] + 1
 		n.mLock.Unlock()
@@ -95,6 +95,10 @@ func (n *TTestScheduler) handleIncoming(event types.ContextEvent) {
 	}
 	if ok {
 		go func(m *types.MessageWrapper) {
+			n.logger.With(map[string]interface{}{
+				"to":     string(m.Msg.To),
+				"msg_id": m.Msg.ID,
+			}).Debug("Dispatching message")
 			n.ctx.Publish(types.EnabledMessage, m)
 		}(m)
 	}
@@ -120,11 +124,21 @@ type ControllerMsgEnvelop struct {
 	Msg       *tmsg.Message   `json:"-"`
 }
 
+func validChannel(chid uint16) bool {
+	// Interpretting messages only of the consensus reactor
+	return chid >= 0x20 && chid <= 0x23
+}
+
 func unmarshal(m []byte) (*ControllerMsgEnvelop, error) {
 	var cMsg ControllerMsgEnvelop
 	err := json.Unmarshal(m, &cMsg)
 	if err != nil {
 		return &cMsg, err
+	}
+
+	if !validChannel(cMsg.ChannelID) {
+		cMsg.Type = "None"
+		return &cMsg, nil
 	}
 
 	msg := proto.Clone(new(tmsg.Message))

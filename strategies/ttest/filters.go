@@ -2,6 +2,7 @@ package ttest
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/ds-test-framework/scheduler/log"
@@ -258,18 +259,30 @@ type RoundSkipFilter struct {
 	roundSkipsCount int
 	roundSkipped    bool
 	height          int
+
+	logger *log.Logger
 }
 
 func NewRoundSkipFilter(ctx *types.Context) *RoundSkipFilter {
+	faults := int((ctx.Replicas.Size() - 1) / 3)
+
+	logger := ctx.Logger.With(map[string]interface{}{
+		"service": "roundskip-filter",
+	})
+	logger.With(map[string]interface{}{
+		"faults": strconv.Itoa(faults),
+	}).Info("Filter setup")
 	return &RoundSkipFilter{
 		fPeers:          make(map[types.ReplicaID]int),
 		fPeersCount:     0,
 		mtx:             new(sync.Mutex),
-		faults:          int((ctx.Replicas.Count() - 1) / 3),
+		faults:          faults,
 		roundSkips:      make(map[types.ReplicaID]bool),
 		roundSkipsCount: 0,
 		roundSkipped:    false,
-		height:          -1,
+		height:          1,
+
+		logger: logger,
 	}
 }
 
@@ -283,6 +296,7 @@ func (e *RoundSkipFilter) checkPeer(msg *ControllerMsgEnvelop) bool {
 	if e.fPeersCount == e.faults+1 {
 		return false
 	}
+	e.logger.With(map[string]interface{}{"peerid": string(msg.To)}).Info("Adding peer to filter")
 	e.fPeers[msg.To] = 0
 	e.fPeersCount = e.fPeersCount + 1
 	e.roundSkips[msg.To] = false
@@ -290,58 +304,68 @@ func (e *RoundSkipFilter) checkPeer(msg *ControllerMsgEnvelop) bool {
 }
 
 // return true if message should be validated for further checks, false if the message should not be blocked
-func (e *RoundSkipFilter) checkHeightRound(peer types.ReplicaID, height, round int) bool {
+func (e *RoundSkipFilter) updateHeightRound(peer types.ReplicaID, height, round int) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
-	// Uncomment to induce round skip only on the first instance
-	// if e.height == -1 {
-	// 	e.height = height
-	// }
-	if height < e.height {
-		return false
-	} else if height > e.height {
-		// Set roundSkipped to true and comment rest if you want to induce round skip only for first instance
-		e.height = height
-		e.roundSkipped = false
-		e.roundSkipsCount = 0
-		for peer := range e.fPeers {
-			e.fPeers[peer] = 0
-			e.roundSkips[peer] = false
-		}
-	} else if height == e.height {
+	if height == e.height {
 		curRound, ok := e.fPeers[peer]
 		if !ok {
-			return false
+			return
 		}
+		e.logger.With(map[string]interface{}{
+			"peer":   peer,
+			"round":  round,
+			"height": height,
+		}).Info("Updating round info")
 		if curRound < round {
+			e.logger.With(map[string]interface{}{
+				"peer_round": curRound,
+				"round":      round,
+			}).Info("Updating peer round")
 			e.fPeers[peer] = round
 			if !e.roundSkips[peer] {
 				e.roundSkips[peer] = true
 				e.roundSkipsCount = e.roundSkipsCount + 1
+				e.logger.With(map[string]interface{}{
+					"peer":        peer,
+					"round":       round,
+					"total_peers": e.roundSkipsCount,
+				}).Info("Peer skipped round")
 				if e.roundSkipsCount == e.faults+1 {
-					log.With(map[string]string{"service": "roundskip-filter"}).Info("Round skipped")
+					e.logger.Info("Round skipped")
 					e.roundSkipped = true
 				}
 			}
 		}
 	}
-	return true
 }
 
-// return true if message should be validated for further checks, false if the message should not be blocked
-func (e *RoundSkipFilter) recordNCheck(msg *ControllerMsgEnvelop) bool {
-
+func (e *RoundSkipFilter) recordNCheck(msg *ControllerMsgEnvelop) {
 	switch msg.Type {
 	case "NewRoundStep":
 		hrs := msg.Msg.GetNewRoundStep()
-		return e.checkHeightRound(msg.From, int(hrs.Height), int(hrs.Round))
+		e.updateHeightRound(msg.From, int(hrs.Height), int(hrs.Round))
+	case "Proposal":
+		prop := msg.Msg.GetProposal()
+		e.updateHeightRound(msg.From, int(prop.Proposal.Height), int(prop.Proposal.Round))
+	case "Prevote":
+		vote := msg.Msg.GetVote()
+		e.updateHeightRound(msg.From, int(vote.Vote.Height), int(vote.Vote.Round))
+	case "Precommit":
+		vote := msg.Msg.GetVote()
+		e.updateHeightRound(msg.From, int(vote.Vote.Height), int(vote.Vote.Round))
+	case "Vote":
+		vote := msg.Msg.GetVote()
+		e.updateHeightRound(msg.From, int(vote.Vote.Height), int(vote.Vote.Round))
 	}
-
-	return true
 }
 
 func (e *RoundSkipFilter) Test(msg *ControllerMsgEnvelop) bool {
+	if msg.Type == "None" {
+		return true
+	}
+
 	// 1. If round skip done then don't do anything
 	e.mtx.Lock()
 	skipped := e.roundSkipped
@@ -349,13 +373,11 @@ func (e *RoundSkipFilter) Test(msg *ControllerMsgEnvelop) bool {
 	if skipped {
 		return true
 	}
-	// 2. Check if peer is something we should block for
+	// 2. Record data about peer. (Round number from any vote message or NewRoundStep)
+	// If its not something we should check for then skip
+	e.recordNCheck(msg)
+	// 3. Check if peer is something we should block for
 	block := e.checkPeer(msg)
-	if !block {
-		return true
-	}
-	// 3. Record data about peer. (Round number from any vote message or NewRoundStep)
-	block = e.recordNCheck(msg)
 	if !block {
 		return true
 	}

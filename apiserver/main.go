@@ -27,7 +27,7 @@ func NewAPIServer(ctx *types.Context) *APIServer {
 		transport: t,
 		ctx:       ctx,
 		gen:       ctx.IDGen,
-		logger: ctx.Logger.With(map[string]string{
+		logger: ctx.Logger.With(map[string]interface{}{
 			"service": "APIServer",
 		}),
 	}
@@ -160,10 +160,10 @@ func (srv *APIServer) HandleStateUpdate(w http.ResponseWriter, r *http.Request) 
 		srv.respond(w, &transport.InternalError)
 	}
 
-	srv.logger.With(map[string]string{
+	srv.logger.With(map[string]interface{}{
 		"state":   s.State,
 		"replica": string(s.Replica),
-	}).Info("Received state update")
+	}).Debug("Received state update")
 
 	srv.ctx.Publish(types.StateMessage, &s)
 	srv.ctx.StateUpdates.AddUpdate(&s)
@@ -182,10 +182,10 @@ func (srv *APIServer) HandleLog(w http.ResponseWriter, r *http.Request) {
 		srv.respond(w, &transport.InternalError)
 	}
 
-	srv.logger.With(map[string]string{
+	srv.logger.With(map[string]interface{}{
 		"params":  fmt.Sprintf("%#v", l.Params),
 		"replica": string(l.Replica),
-	}).Info("Received log")
+	}).Debug("Received log")
 
 	srv.ctx.Publish(types.LogMessage, &l)
 	srv.ctx.Logs.AddUpdate(&l)
@@ -193,7 +193,7 @@ func (srv *APIServer) HandleLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (srv *APIServer) Start() {
-	srv.logger.With(map[string]string{
+	srv.logger.With(map[string]interface{}{
 		"addr": srv.transport.Addr(),
 	}).Info("Starting API server")
 	go srv.transport.Run()

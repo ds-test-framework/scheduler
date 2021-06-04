@@ -7,84 +7,13 @@ import (
 	"github.com/ds-test-framework/scheduler/types"
 )
 
-type peerRoundStore struct {
-	round        int
-	flag         bool
-	skips        int
-	faults       int
-	fPeers       map[types.ReplicaID]int
-	peersSkipped map[types.ReplicaID]bool
-
-	mtx *sync.Mutex
-}
-
-func newPeerRoundStore(round, faults int) *peerRoundStore {
-	return &peerRoundStore{
-		round:        round,
-		flag:         false,
-		skips:        0,
-		faults:       faults,
-		fPeers:       make(map[types.ReplicaID]int),
-		peersSkipped: make(map[types.ReplicaID]bool),
-		mtx:          new(sync.Mutex),
-	}
-}
-
-func (p *peerRoundStore) AddPeer(peer types.ReplicaID) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if len(p.fPeers) == p.faults+1 {
-		return
-	}
-	p.fPeers[peer] = p.round
-}
-
-func (p *peerRoundStore) Peers() []types.ReplicaID {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	replicas := make([]types.ReplicaID, p.faults+1)
-	i := 0
-	for peer := range p.fPeers {
-		replicas[i] = peer
-		i += 1
-	}
-	return replicas
-}
-
-func (p *peerRoundStore) Skipped() bool {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	return p.flag
-}
-
-func (p *peerRoundStore) Record(peer types.ReplicaID, round int) {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-
-	curRound, ok := p.fPeers[peer]
-	if !ok {
-		return
-	}
-	if round > curRound {
-		p.fPeers[peer] = round
-		if !p.peersSkipped[peer] {
-			p.peersSkipped[peer] = true
-			p.skips = p.skips + 1
-			if p.skips == p.faults+1 {
-				p.flag = true
-			}
-		}
-	}
-}
-
 type RoundSkipFilter struct {
 	mtx *sync.Mutex
 
-	fPeer      map[types.ReplicaID]bool
+	fPeer      map[types.ReplicaID]int
 	fPeerCount int
 
 	faults       int
-	roundStore   map[int]*peerRoundStore
 	curRound     int
 	flag         bool
 	height       int
@@ -98,10 +27,9 @@ func NewRoundSkipFilter(ctx *types.Context, height int, roundsToSkip int) *Round
 
 	return &RoundSkipFilter{
 		mtx:          new(sync.Mutex),
-		fPeer:        make(map[types.ReplicaID]bool),
+		fPeer:        make(map[types.ReplicaID]int),
 		fPeerCount:   0,
 		faults:       faults,
-		roundStore:   make(map[int]*peerRoundStore),
 		roundsToSkip: roundsToSkip,
 		curRound:     0,
 		flag:         false,
@@ -150,14 +78,6 @@ func (e *RoundSkipFilter) extractHR(msg *ControllerMsgEnvelop) (int, int) {
 	return -1, -1
 }
 
-func (e *RoundSkipFilter) newStore(round int) {
-	store := newPeerRoundStore(round, e.faults)
-	for peer := range e.fPeer {
-		store.AddPeer(peer)
-	}
-	e.roundStore[round] = store
-}
-
 func (e *RoundSkipFilter) record(peer types.ReplicaID, round int) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
@@ -165,31 +85,25 @@ func (e *RoundSkipFilter) record(peer types.ReplicaID, round int) {
 	if e.fPeerCount != e.faults+1 {
 		_, ok := e.fPeer[peer]
 		if !ok {
-			e.fPeer[peer] = true
-			for _, store := range e.roundStore {
-				store.AddPeer(peer)
-			}
+			e.fPeer[peer] = round
 		}
 	}
 
-	_, ok := e.roundStore[e.curRound]
+	curPeerRound, ok := e.fPeer[peer]
 	if !ok {
-		e.newStore(e.curRound)
+		return
+	}
+	if round > curPeerRound {
+		e.fPeer[peer] = round
 	}
 
-	if round > e.curRound {
-		_, ok = e.roundStore[round]
-		if !ok {
-			e.newStore(round)
+	count := 0
+	for _, round := range e.fPeer {
+		if round > e.curRound {
+			count = count + 1
 		}
-		roundStore := e.roundStore[round]
-		roundStore.Record(peer, round)
 	}
-
-	curRoundStore := e.roundStore[e.curRound]
-	curRoundStore.Record(peer, round)
-
-	if curRoundStore.Skipped() {
+	if count > e.faults {
 		e.curRound = e.curRound + 1
 		if e.curRound == e.roundsToSkip {
 			e.flag = true

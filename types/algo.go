@@ -1,5 +1,7 @@
 package types
 
+import "github.com/spf13/viper"
+
 // RunObj is returned by the AlgoDriver after starting a run
 type RunObj struct {
 	// Ch is used to signal to the scheduler that a run has ended
@@ -25,4 +27,21 @@ type AlgoDriver interface {
 	// Ready called once before the scheduler is run. Should block till the implementation is ready and return true.
 	// If false is returned then the scheduler stops
 	Ready() (bool, *Error)
+}
+
+type FaultModel struct {
+	CanDropMessages bool
+	Byzantine       bool
+}
+
+func NewFaultModel(config *viper.Viper) *FaultModel {
+
+	config.SetDefault("fault_model.byzantine", true)
+	config.SetDefault("fault_model.can_drop_messages", true)
+
+	faultModel := config.Sub("fault_model")
+	return &FaultModel{
+		CanDropMessages: faultModel.GetBool("can_drop_messages"),
+		Byzantine:       faultModel.GetBool("byzantine"),
+	}
 }

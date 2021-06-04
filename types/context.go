@@ -42,6 +42,7 @@ type Context struct {
 	StateUpdates *StateUpdatesStore
 	Logs         *LogStore
 	IDGen        *util.IDGenerator
+	FaultModel   *FaultModel
 
 	subscribers     map[ContextEventType][]chan ContextEvent
 	subscribersLock *sync.Mutex
@@ -67,6 +68,7 @@ func NewContext(config *viper.Viper, logger *log.Logger) *Context {
 		IDGen:           util.NewIDGenerator(),
 		subscribers:     make(map[ContextEventType][]chan ContextEvent),
 		subscribersLock: new(sync.Mutex),
+		FaultModel:      NewFaultModel(config),
 
 		run:     0,
 		runLock: new(sync.Mutex),

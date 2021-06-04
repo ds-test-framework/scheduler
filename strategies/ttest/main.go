@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/types"
@@ -18,6 +19,9 @@ type TTestScheduler struct {
 	ctx    *types.Context
 	stopCh chan bool
 
+	delayStrategy delayStrategy
+	delayed       chan *types.MessageWrapper
+
 	messageTypes map[string]int
 	mLock        *sync.Mutex
 
@@ -28,14 +32,16 @@ type TTestScheduler struct {
 
 // NewTTestScheduler returns a new TTestScheduler
 func NewTTestScheduler(ctx *types.Context) *TTestScheduler {
+	d := newTimeDelayStrategy(200 * time.Millisecond)
 	return &TTestScheduler{
-		stopCh:       make(chan bool, 1),
-		messageTypes: make(map[string]int),
-		mLock:        new(sync.Mutex),
-		filters:      []Filter{}, //NewRoundSkipFilter(ctx) NewBlockNAllow("BlockPart", 5, 10)
-
-		ctx:    ctx,
-		inChan: ctx.Subscribe(types.ScheduledMessage),
+		stopCh:        make(chan bool, 1),
+		messageTypes:  make(map[string]int),
+		mLock:         new(sync.Mutex),
+		filters:       []Filter{NewRoundSkipFilter(ctx, 2, 2)}, //NewRoundSkipFilter(ctx) NewBlockNAllow("BlockPart", 5, 10)
+		delayStrategy: d,
+		ctx:           ctx,
+		inChan:        ctx.Subscribe(types.ScheduledMessage),
+		delayed:       d.Out(),
 		logger: ctx.Logger.With(map[string]interface{}{
 			"service": "TTestScheduler",
 		}),
@@ -101,6 +107,8 @@ func (n *TTestScheduler) handleIncoming(event types.ContextEvent) {
 			}).Debug("Dispatching message")
 			n.ctx.Publish(types.EnabledMessage, m)
 		}(m)
+	} else if !n.ctx.FaultModel.CanDropMessages {
+		n.delayStrategy.AddMessage(m)
 	}
 }
 
@@ -109,6 +117,8 @@ func (n *TTestScheduler) poll() {
 		select {
 		case event := <-n.inChan:
 			go n.handleIncoming(event)
+		case msg := <-n.delayed:
+			go n.ctx.Publish(types.EnabledMessage, msg)
 		case <-n.stopCh:
 			return
 		}

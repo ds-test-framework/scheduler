@@ -58,7 +58,7 @@ func NewBaseTestCase(name string, timeout time.Duration) *BaseTestCase {
 		name: name,
 	}
 }
-func (b *BaseTestCase) Initalize(_ *types.ReplicaStore) TestCaseCtx {
+func (b *BaseTestCase) Initialize(_ *types.ReplicaStore) TestCaseCtx {
 	return b.Ctx
 }
 func (b *BaseTestCase) HandleMessage(_ *types.Message) (bool, []*types.Message) {

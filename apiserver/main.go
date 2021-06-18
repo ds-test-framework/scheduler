@@ -143,6 +143,12 @@ func (srv *APIServer) HandleReplica(w http.ResponseWriter, r *http.Request) {
 		srv.respond(w, &transport.InternalError)
 	}
 
+	srv.logger.With(log.LogParams{
+		"replica_id": replica.ID,
+		"ready":      replica.Ready,
+		"info":       replica.Info,
+	}).Debug("Received replica information")
+
 	srv.ctx.Publish(types.ReplicaUpdate, &replica)
 	srv.ctx.Replicas.UpdateReplica(&replica)
 	srv.respond(w, &transport.AllOk)

@@ -9,6 +9,8 @@ import (
 
 var DefaultLogger *Logger
 
+type LogParams map[string]interface{}
+
 type Logger struct {
 	entry *logrus.Entry
 
@@ -60,7 +62,7 @@ func Error(s string) {
 	DefaultLogger.Error(s)
 }
 
-func With(params map[string]interface{}) *Logger {
+func With(params LogParams) *Logger {
 	return DefaultLogger.With(params)
 }
 
@@ -90,7 +92,7 @@ func (l *Logger) Error(s string) {
 	l.entry.Error(s)
 }
 
-func (l *Logger) With(params map[string]interface{}) *Logger {
+func (l *Logger) With(params LogParams) *Logger {
 	fields := logrus.Fields{}
 	for k, v := range params {
 		fields[k] = v

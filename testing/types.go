@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/types"
 )
 
@@ -13,7 +14,7 @@ type TestCaseCtx interface {
 }
 
 type TestCase interface {
-	Initialize(*types.ReplicaStore) (TestCaseCtx, error)
+	Initialize(*types.ReplicaStore, *log.Logger) (TestCaseCtx, error)
 	HandleMessage(*types.Message) (bool, []*types.Message)
 	HandleStateUpdate(*types.StateUpdate)
 	HandleLogMessage(*types.ReplicaLog)
@@ -48,8 +49,9 @@ func (ctx *BaseTestCaseCtx) Timeout() time.Duration {
 }
 
 type BaseTestCase struct {
-	Ctx  *BaseTestCaseCtx
-	name string
+	Ctx    *BaseTestCaseCtx
+	Logger *log.Logger
+	name   string
 }
 
 func NewBaseTestCase(name string, timeout time.Duration) *BaseTestCase {
@@ -58,8 +60,9 @@ func NewBaseTestCase(name string, timeout time.Duration) *BaseTestCase {
 		name: name,
 	}
 }
-func (b *BaseTestCase) Initialize(_ *types.ReplicaStore) TestCaseCtx {
-	return b.Ctx
+func (b *BaseTestCase) Initialize(_ *types.ReplicaStore, logger *log.Logger) (TestCaseCtx, error) {
+	b.Logger = logger
+	return b.Ctx, nil
 }
 func (b *BaseTestCase) HandleMessage(_ *types.Message) (bool, []*types.Message) {
 	return false, []*types.Message{}

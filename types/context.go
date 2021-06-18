@@ -56,9 +56,8 @@ type Context struct {
 }
 
 func NewContext(config *viper.Viper, logger *log.Logger) *Context {
-	driverConfig := config.Sub("driver")
-	driverConfig.SetDefault("num_replicas", 4)
-	replicaSize := driverConfig.GetInt("num_replicas")
+	config.SetDefault("driver.num_replicas", 4)
+	replicaSize := config.Sub("driver").GetInt("num_replicas")
 
 	return &Context{
 		config:          config,

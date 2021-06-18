@@ -115,7 +115,7 @@ func (s *Server) Run() {
 			continue
 		}
 
-		ctx, err := testCase.Initialize(s.ctx.Replicas)
+		ctx, err := testCase.Initialize(s.ctx.Replicas, logger)
 		if err != nil {
 			logger.Info("Testcase failed to initialize")
 			continue

@@ -9,9 +9,9 @@ In order to start receiving messages, we need to inject an initial workload to t
 
 ## Workflow
 
-1. Messages arrive at the [APIServer](##api-server) which publishes `InterceptedMessage` event on the context.
-2. [Driver](##driver) having subscribed to `InterceptedMessage` event parses the message, decides whether to intercept or not and then publishes `ScheduledMessage` event
-3. [Strategy engine](##strategy) adds the message to the pool and publishes `EnabledMessage` event when it decides to allow it to be delivered.
+1. Messages arrive at the [APIServer](#api-server) which publishes `InterceptedMessage` event on the context.
+2. [Driver](#driver) having subscribed to `InterceptedMessage` event parses the message, decides whether to intercept or not and then publishes `ScheduledMessage` event
+3. [Strategy engine](#strategy) adds the message to the pool and publishes `EnabledMessage` event when it decides to allow it to be delivered.
 4. Driver (listening for `EnabledMessage`) dispatches the message to the intended replica
 
 ## Driver
@@ -26,7 +26,7 @@ Driver's responsibility is to convey the status of the replicas to the scheduler
 - `Stop` is called at the end and the driver can teardown the replicas here.
 
 ### Common driver
-This is a general purpose driver which can be used if the instrumentation uses one of the [client libraries](./client.md). The [workflow](##workflow) is defined assuming the common driver is being used. `WorkloadInjector` interface is used to inject the workload to the replicas which can be adapted to the needs of the specific implementation being tested.
+This is a general purpose driver which can be used if the instrumentation uses one of the [client libraries](./client.md). The [workflow](#workflow) is defined assuming the common driver is being used. `WorkloadInjector` interface is used to inject the workload to the replicas which can be adapted to the needs of the specific implementation being tested.
 
 ## Context
 Context objects contains all the meta information needed by all the components and also acts as a event bus. Ensure that Driver, Strategy is initialized with the context object and does subscribe to the necessary events.
@@ -49,11 +49,11 @@ All endpoints accept `POST` requests with `application/json` body
 
 Endpoint | Model | Description
 -------- | ----- | -----------
-`/messages` | [`Message`](####message) | To send messages intended to another replica
-`/timeout` | [`Timeout](####timeouts) | To send timeouts that can also mode manipulated while testing. [Read here](./timeouts.md)
-`/replica` | [`Replica`](####replica) | Each replica should update its information here when it starts up which can be used to communicate back to the replica, read its ready state, use private key information etc
-`/state` | [`State`](####state) | Can be used to post updates to internal states of the replica
-`/log` | [`Log`](####log) | Can be used to post log messages of the replicas. For example a log message indicating a value has been committed for a particular consensus instance
+`/messages` | [`Message`](#message) | To send messages intended to another replica
+`/timeout` | [`Timeout`](#timeouts) | To send timeouts that can also mode manipulated while testing. [Read here](./timeouts.md)
+`/replica` | [`Replica`](#replica) | Each replica should update its information here when it starts up which can be used to communicate back to the replica, read its ready state, use private key information etc
+`/state` | [`State`](#state) | Can be used to post updates to internal states of the replica
+`/log` | [`Log`](#log) | Can be used to post log messages of the replicas. For example a log message indicating a value has been committed for a particular consensus instance
 
 
 ### Models

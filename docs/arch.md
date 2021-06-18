@@ -5,7 +5,7 @@ Instrumenting an implementation of an algorithm would require the implementation
 
 In order to start receiving messages, we need to inject an initial workload to the distributed system and then being capturing messages. In randomized testing strategies, we will have to repeat this process (called a run), after resetting at the end of every run.
 
-<img src="arch.jpeg" alt="Architecture" width="200"/>
+<img src="arch.jpeg" alt="Architecture" width="800"/>
 
 ## Workflow
 
@@ -13,6 +13,14 @@ In order to start receiving messages, we need to inject an initial workload to t
 2. [Driver](#driver) having subscribed to `InterceptedMessage` event parses the message, decides whether to intercept or not and then publishes `ScheduledMessage` event
 3. [Strategy engine](#strategy) adds the message to the pool and publishes `EnabledMessage` event when it decides to allow it to be delivered.
 4. Driver (listening for `EnabledMessage`) dispatches the message to the intended replica
+
+## Checker command
+- Reads configuration and initializes the `Context` object.
+- Creates a `Checker` instance with the `Context`
+
+Checker instance then,
+- Instantiates `Driver`, `APIServer` and `Strategy` using the `Context` object
+- Starts all the services and runs the main loop based on the [Configuration](./config.md)
 
 ## Driver
 

@@ -8,7 +8,7 @@ The `Checker` module runs the same Strategy over the specified number of runs. C
 
 ## `TestCase` 
 The interface consists of:
-- `Initialize` which is called with the `ReplicaStore` containing information of all the replicas and should return a `TestCaseCtx`
+- `Initialize` which is called with the `ReplicaStore` containing information of all the replicas and should return a `TestCaseCtx`. The testcase should inject any initial workload here and can assume that the test cluster is being run independently
 - `HandleMessage` invoked for every message that is intercepted, should return true if the message can be allowed to be delivered. Can add new messages as a seconds return value.
 - `HandleStateUpdate` is called when a replica posts an update to its internal state
 - `HandleLogMessage` is invoked when a replica send a log message

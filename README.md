@@ -9,3 +9,4 @@ The goal is to be able to intercept messages that are exchanged in a distributed
 
 - [Architecture](./docs/arch.md) of the framework
 - [Development](./docs/development.md)
+- [Testing Server](./docs/testserver.md) - A library to specify test cases for distributed algorithm implementation 

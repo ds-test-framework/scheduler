@@ -50,7 +50,7 @@ func (c *ServerConfig) viperConfig() *viper.Viper {
 }
 
 const (
-	defaultServerAddr   = "0.0.0.0:8081"
+	defaultServerAddr   = "0.0.0.0:87074"
 	defaultLogPath      = ""
 	defaultLogLevel     = "info"
 	defaultReplicaCount = 4

@@ -17,7 +17,7 @@ type graphManager struct {
 	latestEvents map[types.ReplicaID]uint
 	sends        map[types.ReplicaID][]uint
 	receives     map[types.ReplicaID][]uint
-	graph        *types.DirectedGraph
+	graph        *DirectedGraph
 	lock         *sync.Mutex
 }
 
@@ -26,7 +26,7 @@ func newGraphManager() *graphManager {
 		latestEvents: make(map[types.ReplicaID]uint),
 		sends:        make(map[types.ReplicaID][]uint),
 		receives:     make(map[types.ReplicaID][]uint),
-		graph:        types.NewDirectedGraph(),
+		graph:        NewDirectedGraph(),
 		lock:         new(sync.Mutex),
 	}
 }
@@ -59,7 +59,23 @@ func (m *graphManager) AddEvent(
 		e.UpdatePrev(prevN)
 	}
 
-	msg, ok := messages.Get(e.MsgID)
+	if e.Type.Type() != types.ReceiveMessageType && e.Type.Type() != types.SendMessageType {
+		return types.NewError(
+			ErrInvalidEventId,
+			"Event type is neither send or receive",
+		)
+	}
+	var msg *types.Message
+	switch e.Type.Type() {
+	case types.ReceiveMessageType:
+		eT := e.Type.(*types.ReceiveMessage)
+		msg = eT.Message()
+	case types.SendMessageType:
+		eT := e.Type.(*types.SendMessage)
+		msg = eT.Message()
+	}
+
+	_, ok := messages.Get(msg.ID)
 	if !ok {
 		return types.NewError(
 			ErrInvalidMsgId,
@@ -67,7 +83,7 @@ func (m *graphManager) AddEvent(
 		)
 	}
 
-	if e.Type == types.Receive {
+	if e.Type.Type() == types.ReceiveMessageType {
 		sendEvent, ok := events.Get(msg.GetSendEvent())
 		if !ok {
 			return types.NewError(
@@ -90,13 +106,13 @@ func (m *graphManager) AddEvent(
 func (m *graphManager) updateSendsReceives(e *types.Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if e.Type == types.Send {
+	if e.Type.Type() == types.SendMessageType {
 		_, ok := m.sends[e.Replica]
 		if !ok {
 			m.sends[e.Replica] = make([]uint, 0)
 		}
 		m.sends[e.Replica] = append(m.sends[e.Replica], e.ID)
-	} else if e.Type == types.Receive {
+	} else if e.Type.Type() == types.ReceiveMessageType {
 		_, ok := m.receives[e.Replica]
 		if !ok {
 			m.receives[e.Replica] = make([]uint, 0)
@@ -146,14 +162,14 @@ func (m *graphManager) Reset() {
 	m.latestEvents = make(map[types.ReplicaID]uint)
 	m.sends = make(map[types.ReplicaID][]uint)
 	m.receives = make(map[types.ReplicaID][]uint)
-	m.graph = types.NewDirectedGraph()
+	m.graph = NewDirectedGraph()
 }
 
 type graphPseudoManager struct {
 	latestEvents map[types.ReplicaID]uint
 	sends        map[types.ReplicaID][]uint
 	receives     map[types.ReplicaID][]uint
-	graph        *types.DirectedGraph
+	graph        *DirectedGraph
 	lock         *sync.Mutex
 }
 
@@ -168,6 +184,22 @@ func (m *graphPseudoManager) AddEvent(
 			"Event is empty",
 		)
 	}
+	if e.Type.Type() != types.ReceiveMessageType && e.Type.Type() != types.SendMessageType {
+		return false, types.NewError(
+			ErrInvalidEventId,
+			"Event type is neither send or receive",
+		)
+	}
+	var msg *types.Message
+	switch e.Type.Type() {
+	case types.ReceiveMessageType:
+		eT := e.Type.(*types.ReceiveMessage)
+		msg = eT.Message()
+	case types.SendMessageType:
+		eT := e.Type.(*types.SendMessage)
+		msg = eT.Message()
+	}
+
 	// logger.Debug(fmt.Sprintf("Graph Pseudo Manager: Adding event to graph: %#v", e))
 	events.MarkDirty(e.ID)
 	events.Set(e)
@@ -179,7 +211,7 @@ func (m *graphPseudoManager) AddEvent(
 		)
 	}
 	m.graph.UpdateEvent(e)
-	messages.MarkDirty(e.MsgID)
+	messages.MarkDirty(msg.ID)
 
 	parents := make([]*types.Event, 0)
 	weights := make([]int, 0)
@@ -201,7 +233,7 @@ func (m *graphPseudoManager) AddEvent(
 		e.UpdatePrev(prevN)
 	}
 
-	msg, ok := messages.Get(e.MsgID)
+	_, ok = messages.Get(msg.ID)
 	if !ok {
 		return false, types.NewError(
 			ErrInvalidMsgId,
@@ -209,7 +241,7 @@ func (m *graphPseudoManager) AddEvent(
 		)
 	}
 
-	if e.Type == types.Receive {
+	if e.Type.Type() == types.ReceiveMessageType {
 		sendEvent, ok := events.Get(msg.GetSendEvent())
 		if !ok {
 			return false, types.NewError(
@@ -230,7 +262,7 @@ func (m *graphPseudoManager) AddEvent(
 	}
 	// logger.Debug(fmt.Sprintf("Graph Pseudo Manager: Added event: %#v", e))
 
-	if msg.Timeout && e.Type == types.Receive {
+	if msg.Timeout && e.Type.Type() == types.ReceiveMessageType {
 		pairs := m.findPairs(e)
 		// logger.Debug(fmt.Sprintf("Graph Pseudo Manager: Done finding pairs for event: %#v", e))
 		for _, p := range pairs {
@@ -291,8 +323,23 @@ func (m *graphPseudoManager) checkPair(
 ) (bool, *types.Error) {
 	// logger.Debug(fmt.Sprintf("Graph Pseudo Manager: Checking pair: %#v, %#v", r1, r2))
 
-	message1, ok1 := messages.Get(r1.MsgID)
-	message2, ok2 := messages.Get(r2.MsgID)
+	mID1, ok := r1.MessageID()
+	if !ok {
+		return false, types.NewError(
+			ErrInvalidEventId,
+			"Event is neither send or receive of a message",
+		)
+	}
+	mID2, ok := r2.MessageID()
+	if !ok {
+		return false, types.NewError(
+			ErrInvalidEventId,
+			"Event is neither send or receive of a message",
+		)
+	}
+
+	message1, ok1 := messages.Get(mID1)
+	message2, ok2 := messages.Get(mID2)
 
 	if !ok1 || !ok2 {
 		return false, types.NewError(
@@ -310,7 +357,7 @@ func (m *graphPseudoManager) checkPair(
 	send1N, ok := m.graph.GetNode(send1.ID)
 	if !ok {
 		return false, types.NewError(
-			types.ErrInvalidNodeID,
+			ErrInvalidNodeID,
 			"Could not find send1 node",
 		)
 	}
@@ -325,7 +372,7 @@ func (m *graphPseudoManager) checkPair(
 	send2N, ok := m.graph.GetNode(send2.ID)
 	if !ok {
 		return false, types.NewError(
-			types.ErrInvalidNodeID,
+			ErrInvalidNodeID,
 			"Could not find send2 node",
 		)
 	}
@@ -340,7 +387,7 @@ func (m *graphPseudoManager) checkPair(
 		sendN, ok := m.graph.GetNode(send)
 		if !ok {
 			return false, types.NewError(
-				types.ErrInvalidNodeID,
+				ErrInvalidNodeID,
 				"Could not find send node",
 			)
 		}
@@ -354,7 +401,14 @@ func (m *graphPseudoManager) checkPair(
 						fmt.Sprintf("Graph pseudo manager: Invalid send event id: %d", cur.ID),
 					)
 				}
-				message, ok := messages.Get(curE.MsgID)
+				mId, ok := curE.MessageID()
+				if !ok {
+					return children, types.NewError(
+						ErrInvalidEventId,
+						"Event is neither send or receive of a message",
+					)
+				}
+				message, ok := messages.Get(mId)
 				if !ok {
 					return children, types.NewError(
 						ErrInvalidMsgId,
@@ -362,7 +416,7 @@ func (m *graphPseudoManager) checkPair(
 					)
 				}
 				var check *types.Event
-				if curE.Type == types.Send && message.Timeout {
+				if curE.Type.Type() == types.SendMessageType && message.Timeout {
 					check, ok = events.Get(message.GetReceiveEvent())
 				} else {
 					check, ok = events.Get(curE.GetNext())
@@ -421,13 +475,13 @@ func (m *graphPseudoManager) updateLatest(e *types.Event) (uint, bool) {
 func (m *graphPseudoManager) updateSendsReceives(e *types.Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if e.Type == types.Send {
+	if e.Type.Type() == types.SendMessageType {
 		_, ok := m.sends[e.Replica]
 		if !ok {
 			m.sends[e.Replica] = make([]uint, 0)
 		}
 		m.sends[e.Replica] = append(m.sends[e.Replica], e.ID)
-	} else if e.Type == types.Receive {
+	} else if e.Type.Type() == types.ReceiveMessageType {
 		_, ok := m.receives[e.Replica]
 		if !ok {
 			m.receives[e.Replica] = make([]uint, 0)

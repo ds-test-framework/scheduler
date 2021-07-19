@@ -2,77 +2,7 @@ package types
 
 import "sync"
 
-type EventType string
 type ReplicaID string
-
-const (
-	Send    EventType = "Send"
-	Receive EventType = "Receive"
-)
-
-// Event encapsulates a message send/receive all necessary information
-type Event struct {
-	ID        uint
-	Type      EventType
-	MsgID     string
-	Timestamp int64
-	Replica   ReplicaID
-	Prev      uint
-	Next      uint
-	lock      *sync.Mutex
-}
-
-func NewEvent(id uint, replica ReplicaID, t EventType, ts int64, msg string) *Event {
-	return &Event{
-		ID:        id,
-		Replica:   replica,
-		Type:      t,
-		MsgID:     msg,
-		Timestamp: ts,
-		Prev:      0,
-		Next:      0,
-		lock:      new(sync.Mutex),
-	}
-}
-
-func (e *Event) UpdatePrev(p *Event) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	e.Prev = p.ID
-}
-
-func (e *Event) UpdateNext(n *Event) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	e.Next = n.ID
-}
-
-func (e *Event) GetNext() uint {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	return e.Next
-}
-
-func (e *Event) Clone() *Event {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	return &Event{
-		ID:        e.ID,
-		Replica:   e.Replica,
-		Type:      e.Type,
-		MsgID:     e.MsgID,
-		Timestamp: e.Timestamp,
-		Prev:      e.Prev,
-		Next:      e.Next,
-		lock:      new(sync.Mutex),
-	}
-}
-
-func (e *Event) Eq(o *Event) bool {
-	return e.ID == o.ID
-}
 
 // Message encapsulates communication between the nodes/replicas
 type Message struct {

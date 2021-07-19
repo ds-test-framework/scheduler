@@ -35,7 +35,7 @@ func NewAPIServer(ctx *types.Context) *APIServer {
 	t.AddHandler("/message", server.HandleMessage)
 	t.AddHandler("/timeout", server.HandleTimeout)
 	t.AddHandler("/replica", server.HandleReplica)
-	t.AddHandler("/state", server.HandleStateUpdate)
+	t.AddHandler("/event", server.HandleEvent)
 	t.AddHandler("/log", server.HandleLog)
 
 	return server
@@ -64,6 +64,31 @@ func (srv *APIServer) readRequest(w http.ResponseWriter, r *http.Request) ([]byt
 		return nil, false
 	}
 	return bodyBytes, true
+}
+
+type eventS struct {
+	types.Event `json:",inline"`
+	Params      map[string]string `json:"params"`
+}
+
+func (srv *APIServer) HandleEvent(w http.ResponseWriter, r *http.Request) {
+	body, ok := srv.readRequest(w, r)
+	if !ok {
+		return
+	}
+	var e eventS
+	err := json.Unmarshal(body, &e)
+	if err != nil {
+		srv.respond(w, &transport.InternalError)
+	}
+
+	_ = types.NewEvent(
+		uint(srv.gen.Next()),
+		e.Replica,
+		types.NewReplicaEvent(e.TypeS, e.Params),
+		e.Timestamp,
+	)
+	srv.respond(w, &transport.AllOk)
 }
 
 func (srv *APIServer) HandleMessage(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +172,7 @@ func (srv *APIServer) HandleReplica(w http.ResponseWriter, r *http.Request) {
 		"replica_id": replica.ID,
 		"ready":      replica.Ready,
 		"info":       replica.Info,
-	}).Debug("Received replica information")
+	}).Info("Received replica information")
 
 	srv.ctx.Publish(types.ReplicaUpdate, &replica)
 	srv.ctx.Replicas.UpdateReplica(&replica)

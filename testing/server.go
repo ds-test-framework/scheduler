@@ -2,6 +2,7 @@ package testing
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/ds-test-framework/scheduler/apiserver"
@@ -67,6 +68,7 @@ type Server struct {
 	resultMap *resultMap
 
 	stopCh chan bool
+	stopO  *sync.Once
 }
 
 func NewTestServer(config ServerConfig, testcases []TestCase) (*Server, error) {
@@ -92,6 +94,7 @@ func NewTestServer(config ServerConfig, testcases []TestCase) (*Server, error) {
 		resultMap: newResultMap(),
 
 		stopCh: make(chan bool),
+		stopO:  new(sync.Once),
 	}
 
 	go server.driver.Run()
@@ -126,6 +129,9 @@ func (s *Server) Run() {
 			logger.Debug("Testcase indicated done")
 		case <-time.After(ctx.Timeout()):
 			logger.Debug("Testcase timeout reached")
+		case <-s.stopCh:
+			s.logger.Debug("Stopping server main loop prematurely")
+			return
 		}
 
 		err = testCase.Assert()
@@ -150,9 +156,10 @@ func (s *Server) Run() {
 
 func (s *Server) Stop() {
 	s.logger.Info("Received Stop signal")
-	close(s.stopCh)
-	s.driver.Stop()
-	s.apiServer.Stop()
-
-	log.Destroy()
+	s.stopO.Do(func() {
+		close(s.stopCh)
+		s.driver.Stop()
+		s.apiServer.Stop()
+		log.Destroy()
+	})
 }

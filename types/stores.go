@@ -2,60 +2,6 @@ package types
 
 import "sync"
 
-type StateUpdate struct {
-	Replica ReplicaID `json:"id"`
-	State   string    `json:"state"`
-}
-
-func (u *StateUpdate) Clone() Clonable {
-	if u == nil {
-		return nil
-	}
-	return &StateUpdate{
-		Replica: u.Replica,
-		State:   u.State,
-	}
-}
-
-type StateUpdatesStore struct {
-	curRun  int
-	updates map[int]map[ReplicaID][]string
-
-	lock *sync.Mutex
-}
-
-func NewStateUpdatesStore() *StateUpdatesStore {
-	return &StateUpdatesStore{
-		curRun:  0,
-		updates: make(map[int]map[ReplicaID][]string),
-		lock:    new(sync.Mutex),
-	}
-}
-
-func (s *StateUpdatesStore) SetRun(i int) {
-	s.lock.Lock()
-	s.curRun = i
-	s.updates[s.curRun] = make(map[ReplicaID][]string)
-	s.lock.Unlock()
-}
-
-func (s *StateUpdatesStore) AddUpdate(update *StateUpdate) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	_, ok := s.updates[s.curRun]
-	if !ok {
-		s.updates[s.curRun] = make(map[ReplicaID][]string)
-	}
-
-	_, ok = s.updates[s.curRun][update.Replica]
-	if !ok {
-		s.updates[s.curRun][update.Replica] = make([]string, 0)
-	}
-	s.updates[s.curRun][update.Replica] = append(s.updates[s.curRun][update.Replica], update.State)
-
-}
-
 type ReplicaLog struct {
 	Replica ReplicaID              `json:"id"`
 	Params  map[string]interface{} `json:"params"`

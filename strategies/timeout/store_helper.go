@@ -27,7 +27,7 @@ func (s *eventPseudoStore) MarkDirty(eid uint) {
 		s.dirty[eid] = nil
 		return
 	}
-	s.dirty[eid] = event.Clone()
+	s.dirty[eid] = event.Clone().(*types.Event)
 }
 
 func (s *eventPseudoStore) Get(eid uint) (*types.Event, bool) {

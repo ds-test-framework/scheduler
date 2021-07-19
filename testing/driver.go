@@ -15,7 +15,7 @@ import (
 type testDriver struct {
 	ctx          *types.Context
 	messages     chan types.ContextEvent
-	stateUpdates chan types.ContextEvent
+	eventUpdates chan types.ContextEvent
 	logs         chan types.ContextEvent
 	msgStore     *common.MsgStore
 	dispatchCh   chan types.ReplicaID
@@ -35,7 +35,7 @@ func newTestDriver(ctx *types.Context) *testDriver {
 	d := &testDriver{
 		ctx:          ctx,
 		messages:     ctx.Subscribe(types.InterceptedMessage),
-		stateUpdates: ctx.Subscribe(types.StateMessage),
+		eventUpdates: ctx.Subscribe(types.EventMessage),
 		logs:         ctx.Subscribe(types.LogMessage),
 		dispatchCh:   make(chan types.ReplicaID, 10),
 		stopCh:       make(chan bool),
@@ -115,9 +115,9 @@ func (d *testDriver) pollAPI() {
 			if event.Type == types.InterceptedMessage {
 				go d.handleMessage(event)
 			}
-		case event := <-d.stateUpdates:
-			if event.Type == types.StateMessage {
-				go d.handleStateUpdate(event)
+		case event := <-d.eventUpdates:
+			if event.Type == types.EventMessage {
+				go d.handleEventUpdate(event)
 			}
 		case event := <-d.logs:
 			if event.Type == types.LogMessage {
@@ -157,21 +157,6 @@ func (d *testDriver) handleMessage(event types.ContextEvent) {
 	}
 }
 
-func (d *testDriver) handleStateUpdate(event types.ContextEvent) {
-	state, ok := event.Data.(*types.StateUpdate)
-	if !ok {
-		return
-	}
-	d.mtx.Lock()
-	testCase := d.curTestCase
-	d.mtx.Unlock()
-	if testCase == nil {
-		return
-	}
-
-	testCase.HandleStateUpdate(state)
-}
-
 func (d *testDriver) handleLogMessage(event types.ContextEvent) {
 	log, ok := event.Data.(*types.ReplicaLog)
 	if !ok {
@@ -183,8 +168,21 @@ func (d *testDriver) handleLogMessage(event types.ContextEvent) {
 	if testCase == nil {
 		return
 	}
-
 	testCase.HandleLogMessage(log)
+}
+
+func (d *testDriver) handleEventUpdate(event types.ContextEvent) {
+	e, ok := event.Data.(*types.Event)
+	if !ok {
+		return
+	}
+	d.mtx.Lock()
+	testCase := d.curTestCase
+	d.mtx.Unlock()
+	if testCase == nil {
+		return
+	}
+	testCase.HandleEvent(e)
 }
 
 func (d *testDriver) dispatch(replicaID types.ReplicaID) {

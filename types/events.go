@@ -142,7 +142,7 @@ func (e *Event) GetNext() uint {
 	return e.Next
 }
 
-func (e *Event) Clone() *Event {
+func (e *Event) Clone() Clonable {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	return &Event{

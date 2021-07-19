@@ -28,7 +28,7 @@ const (
 	EnabledMessage     ContextEventType = "EnabledMessage"
 	ScheduledMessage   ContextEventType = "ScheduledMessage"
 	LogMessage         ContextEventType = "LogMessage"
-	StateMessage       ContextEventType = "StateMessage"
+	EventMessage       ContextEventType = "EventMessage"
 )
 
 func (e ContextEventType) String() string {
@@ -38,11 +38,11 @@ func (e ContextEventType) String() string {
 // Should have all the channels and subscribers not the actual instances of driver, engine
 // Should not run its own go routines, Just outputting on channels
 type Context struct {
-	Replicas     *ReplicaStore
-	StateUpdates *StateUpdatesStore
-	Logs         *LogStore
-	IDGen        *util.IDGenerator
-	FaultModel   *FaultModel
+	Replicas   *ReplicaStore
+	Logs       *LogStore
+	IDGen      *util.IDGenerator
+	EventGraph *EventGraph
+	FaultModel *FaultModel
 
 	subscribers     map[ContextEventType][]chan ContextEvent
 	subscribersLock *sync.Mutex
@@ -61,9 +61,9 @@ func NewContext(config *viper.Viper, logger *log.Logger) *Context {
 
 	return &Context{
 		config:          config,
-		StateUpdates:    NewStateUpdatesStore(),
 		Logs:            NewLogStore(),
 		Replicas:        NewReplicaStore(replicaSize),
+		EventGraph:      NewEventGraph(),
 		IDGen:           util.NewIDGenerator(),
 		subscribers:     make(map[ContextEventType][]chan ContextEvent),
 		subscribersLock: new(sync.Mutex),
@@ -86,7 +86,6 @@ func (c *Context) SetRun(run int) {
 	c.runLock.Lock()
 	c.run = run
 	c.runLock.Unlock()
-	c.StateUpdates.SetRun(run)
 	c.Logs.SetRun(run)
 }
 

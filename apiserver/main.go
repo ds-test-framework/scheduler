@@ -71,26 +71,6 @@ type eventS struct {
 	Params      map[string]string `json:"params"`
 }
 
-func (srv *APIServer) HandleEvent(w http.ResponseWriter, r *http.Request) {
-	body, ok := srv.readRequest(w, r)
-	if !ok {
-		return
-	}
-	var e eventS
-	err := json.Unmarshal(body, &e)
-	if err != nil {
-		srv.respond(w, &transport.InternalError)
-	}
-
-	_ = types.NewEvent(
-		uint(srv.gen.Next()),
-		e.Replica,
-		types.NewReplicaEvent(e.TypeS, e.Params),
-		e.Timestamp,
-	)
-	srv.respond(w, &transport.AllOk)
-}
-
 func (srv *APIServer) HandleMessage(w http.ResponseWriter, r *http.Request) {
 	body, ok := srv.readRequest(w, r)
 	if !ok {
@@ -179,25 +159,31 @@ func (srv *APIServer) HandleReplica(w http.ResponseWriter, r *http.Request) {
 	srv.respond(w, &transport.AllOk)
 }
 
-func (srv *APIServer) HandleStateUpdate(w http.ResponseWriter, r *http.Request) {
+func (srv *APIServer) HandleEvent(w http.ResponseWriter, r *http.Request) {
 	body, ok := srv.readRequest(w, r)
 	if !ok {
 		return
 	}
-
-	var s types.StateUpdate
-	err := json.Unmarshal(body, &s)
+	var e eventS
+	err := json.Unmarshal(body, &e)
 	if err != nil {
 		srv.respond(w, &transport.InternalError)
 	}
 
-	srv.logger.With(map[string]interface{}{
-		"state":   s.State,
-		"replica": string(s.Replica),
-	}).Debug("Received state update")
+	event := types.NewEvent(
+		uint(srv.gen.Next()),
+		e.Replica,
+		types.NewReplicaEvent(e.TypeS, e.Params),
+		e.Timestamp,
+	)
 
-	srv.ctx.Publish(types.StateMessage, &s)
-	srv.ctx.StateUpdates.AddUpdate(&s)
+	srv.logger.With(log.LogParams{
+		"replica_id": event.Replica,
+		"type":       event.TypeS,
+	}).Debug("Received event")
+
+	srv.ctx.EventGraph.AddEvent(event)
+	srv.ctx.Publish(types.EventMessage, event)
 	srv.respond(w, &transport.AllOk)
 }
 

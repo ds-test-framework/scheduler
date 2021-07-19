@@ -16,7 +16,7 @@ type TestCaseCtx interface {
 type TestCase interface {
 	Initialize(*types.ReplicaStore, *log.Logger) (TestCaseCtx, error)
 	HandleMessage(*types.Message) (bool, []*types.Message)
-	HandleStateUpdate(*types.StateUpdate)
+	HandleEvent(*types.Event)
 	HandleLogMessage(*types.ReplicaLog)
 	Assert() error
 
@@ -67,7 +67,7 @@ func (b *BaseTestCase) Initialize(_ *types.ReplicaStore, logger *log.Logger) (Te
 func (b *BaseTestCase) HandleMessage(_ *types.Message) (bool, []*types.Message) {
 	return false, []*types.Message{}
 }
-func (b *BaseTestCase) HandleStateUpdate(_ *types.StateUpdate) {
+func (b *BaseTestCase) HandleEvent(_ *types.Event) {
 }
 func (b *BaseTestCase) HandleLogMessage(_ *types.ReplicaLog) {
 }

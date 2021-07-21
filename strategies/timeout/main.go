@@ -172,9 +172,9 @@ func (e *TimeoutEngine) createEvents(msg *types.Message) (*types.Event, *types.E
 	e.counterLock.Lock()
 	defer e.counterLock.Unlock()
 
-	sendEvent := types.NewEvent(e.eventCounter, msg.From, types.NewSendMessageEvent(msg), 0)
+	sendEvent := types.NewEvent(e.eventCounter, msg.From, types.NewSendMessageEventType(msg), 0)
 	e.eventCounter = e.eventCounter + 1
-	receiveEvent := types.NewEvent(e.eventCounter, msg.To, types.NewReceiveMessageEvent(msg), 0)
+	receiveEvent := types.NewEvent(e.eventCounter, msg.To, types.NewReceiveMessageEventType(msg), 0)
 	e.eventCounter = e.eventCounter + 1
 
 	msg.UpdateReceiveEvent(receiveEvent.ID)
@@ -187,11 +187,11 @@ func (e *TimeoutEngine) createEvents(msg *types.Message) (*types.Event, *types.E
 
 // TODO: Can leak from previous run. Need to be able to cancel the scheduled receives
 func (e *TimeoutEngine) scheduleReceive(event *types.Event) {
-	if event.Type.Type() != types.ReceiveMessageType {
+	if event.Type.Type() != types.ReceiveMessageTypeS {
 		e.eventChan <- event
 	}
 	eventType := event.Type
-	eT, ok := eventType.(*types.ReceiveMessage)
+	eT, ok := eventType.(*types.ReceiveMessageEventType)
 	msg := eT.Message()
 	_, ok = e.messageStore.Get(msg.ID)
 	var d int
@@ -207,7 +207,7 @@ func (e *TimeoutEngine) scheduleReceive(event *types.Event) {
 }
 
 func (e *TimeoutEngine) handleReceiveEvent(event *types.Event) {
-	if event.Type.Type() != types.ReceiveMessageType {
+	if event.Type.Type() != types.ReceiveMessageTypeS {
 		return
 	}
 	_, ok := e.eventStore.Get(event.ID)
@@ -215,7 +215,7 @@ func (e *TimeoutEngine) handleReceiveEvent(event *types.Event) {
 		return
 	}
 	eventType := event.Type
-	eT, ok := eventType.(*types.ReceiveMessage)
+	eT, ok := eventType.(*types.ReceiveMessageEventType)
 	msg := eT.Message()
 	// logger.Debug(fmt.Sprintf("Engine: Handling receive: %#v", event))
 	_, ok = e.messageStore.Get(msg.ID)
@@ -244,7 +244,7 @@ func (e *TimeoutEngine) handleReceiveEvent(event *types.Event) {
 			mPseudo := e.messageStore.Pseudo()
 			ePseudo := e.eventStore.Pseudo()
 
-			rEventType := pReceive.Type.(*types.ReceiveMessage)
+			rEventType := pReceive.Type.(*types.ReceiveMessageEventType)
 			rMessage := rEventType.Message()
 
 			mPseudo.MarkDirty(rMessage.ID)
@@ -314,14 +314,14 @@ func (e *TimeoutEngine) dispatch(msgID string) {
 }
 
 func (e *TimeoutEngine) handleSendEvent(event *types.Event) {
-	if event.Type.Type() != types.SendMessageType {
+	if event.Type.Type() != types.SendMessageTypeS {
 		return
 	}
 	_, ok := e.eventStore.Get(event.ID)
 	if !ok {
 		return
 	}
-	eT, ok := event.Type.(*types.SendMessage)
+	eT, ok := event.Type.(*types.SendMessageEventType)
 	if !ok {
 		return
 	}
@@ -353,7 +353,7 @@ func (e *TimeoutEngine) pollEventChan() {
 		case event := <-e.eventChan:
 			// logger.Debug(fmt.Sprintf("Engine: Handling event: %#v", event))
 			if !e.isPaused() {
-				if event.Type.Type() == types.SendMessageType {
+				if event.Type.Type() == types.SendMessageTypeS {
 					e.handleSendEvent(event)
 				} else {
 					e.handleReceiveEvent(event)

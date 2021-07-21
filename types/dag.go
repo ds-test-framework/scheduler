@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"sync"
 )
 
@@ -60,13 +61,13 @@ func (s *NodeSet) Has(id uint) bool {
 }
 
 type Node struct {
-	ID          uint
-	Event       *Event
-	Parents     *NodeSet
-	Children    *NodeSet
-	Ancestors   *NodeSet
-	Descendants *NodeSet
-	lock        *sync.Mutex
+	ID          uint        `json:"id"`
+	Event       *Event      `json:"event"`
+	Parents     *NodeSet    `json:"-"`
+	Children    *NodeSet    `json:"-"`
+	Ancestors   *NodeSet    `json:"-"`
+	Descendants *NodeSet    `json:"-"`
+	lock        *sync.Mutex `json:"-"`
 }
 
 func NewNode(e *Event, parents []*Node) *Node {
@@ -145,6 +146,53 @@ func NewEventGraph() *EventGraph {
 	}
 }
 
-func (g *EventGraph) AddEvent(e *Event) error {
-	return nil
+func (g *EventGraph) AddEvent(e *Event, parents []*Event) {
+	parentNodes := make([]*Node, 0)
+	for _, p := range parents {
+		if g.Nodes.Has(p.ID) {
+			parentNodes = append(parentNodes, g.Nodes.Get(p.ID))
+		}
+	}
+
+	node := NewNode(e, parentNodes)
+	if len(parents) == 0 {
+		g.Roots.Add(node)
+	}
+	g.Nodes.Add(node)
+}
+
+func (g *EventGraph) GetEventNode(eid uint) (*Node, bool) {
+	ok := g.Nodes.Has(eid)
+	if ok {
+		return g.Nodes.Get(eid), ok
+	}
+	return nil, ok
+}
+
+type edge struct {
+	From uint `json:"from"`
+	To   uint `json:"to"`
+}
+
+type matrix struct {
+	Nodes []*Node `json:"nodes"`
+	Edges []*edge `json:"edges"`
+}
+
+// Adjacency matrix representation is encoded
+func (g *EventGraph) MarshalJSON() ([]byte, error) {
+	allnodes := g.Nodes.Iter()
+	m := &matrix{
+		Nodes: allnodes,
+		Edges: make([]*edge, 0),
+	}
+	for _, n := range allnodes {
+		for _, child := range n.Children.Iter() {
+			m.Edges = append(m.Edges, &edge{
+				From: n.ID,
+				To:   child.ID,
+			})
+		}
+	}
+	return json.Marshal(m)
 }

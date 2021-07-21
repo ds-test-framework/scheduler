@@ -3,6 +3,7 @@ module github.com/ds-test-framework/scheduler
 go 1.16
 
 require (
+	github.com/gin-gonic/gin v1.7.2 // indirect
 	github.com/gogo/protobuf v1.3.2
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.3

@@ -166,6 +166,10 @@ func (master *CommonDriver) dispatchMessage(msg *types.Message) {
 	peer, ok := master.ctx.Replicas.GetReplica(msg.To)
 
 	if ok && master.msgStore.Exists(msg.ID) {
+		master.ctx.Publish(types.UnInterceptedMessage, &types.MessageWrapper{
+			Msg: msg,
+		})
+
 		master.sendPeerMsg(peer, msg)
 	}
 }

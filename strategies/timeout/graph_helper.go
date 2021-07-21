@@ -59,7 +59,7 @@ func (m *graphManager) AddEvent(
 		e.UpdatePrev(prevN)
 	}
 
-	if e.Type.Type() != types.ReceiveMessageType && e.Type.Type() != types.SendMessageType {
+	if e.Type.Type() != types.ReceiveMessageTypeS && e.Type.Type() != types.SendMessageTypeS {
 		return types.NewError(
 			ErrInvalidEventId,
 			"Event type is neither send or receive",
@@ -67,11 +67,11 @@ func (m *graphManager) AddEvent(
 	}
 	var msg *types.Message
 	switch e.Type.Type() {
-	case types.ReceiveMessageType:
-		eT := e.Type.(*types.ReceiveMessage)
+	case types.ReceiveMessageTypeS:
+		eT := e.Type.(*types.ReceiveMessageEventType)
 		msg = eT.Message()
-	case types.SendMessageType:
-		eT := e.Type.(*types.SendMessage)
+	case types.SendMessageTypeS:
+		eT := e.Type.(*types.SendMessageEventType)
 		msg = eT.Message()
 	}
 
@@ -83,7 +83,7 @@ func (m *graphManager) AddEvent(
 		)
 	}
 
-	if e.Type.Type() == types.ReceiveMessageType {
+	if e.Type.Type() == types.ReceiveMessageTypeS {
 		sendEvent, ok := events.Get(msg.GetSendEvent())
 		if !ok {
 			return types.NewError(
@@ -106,13 +106,13 @@ func (m *graphManager) AddEvent(
 func (m *graphManager) updateSendsReceives(e *types.Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if e.Type.Type() == types.SendMessageType {
+	if e.Type.Type() == types.SendMessageTypeS {
 		_, ok := m.sends[e.Replica]
 		if !ok {
 			m.sends[e.Replica] = make([]uint, 0)
 		}
 		m.sends[e.Replica] = append(m.sends[e.Replica], e.ID)
-	} else if e.Type.Type() == types.ReceiveMessageType {
+	} else if e.Type.Type() == types.ReceiveMessageTypeS {
 		_, ok := m.receives[e.Replica]
 		if !ok {
 			m.receives[e.Replica] = make([]uint, 0)
@@ -184,7 +184,7 @@ func (m *graphPseudoManager) AddEvent(
 			"Event is empty",
 		)
 	}
-	if e.Type.Type() != types.ReceiveMessageType && e.Type.Type() != types.SendMessageType {
+	if e.Type.Type() != types.ReceiveMessageTypeS && e.Type.Type() != types.SendMessageTypeS {
 		return false, types.NewError(
 			ErrInvalidEventId,
 			"Event type is neither send or receive",
@@ -192,11 +192,11 @@ func (m *graphPseudoManager) AddEvent(
 	}
 	var msg *types.Message
 	switch e.Type.Type() {
-	case types.ReceiveMessageType:
-		eT := e.Type.(*types.ReceiveMessage)
+	case types.ReceiveMessageTypeS:
+		eT := e.Type.(*types.ReceiveMessageEventType)
 		msg = eT.Message()
-	case types.SendMessageType:
-		eT := e.Type.(*types.SendMessage)
+	case types.SendMessageTypeS:
+		eT := e.Type.(*types.SendMessageEventType)
 		msg = eT.Message()
 	}
 
@@ -241,7 +241,7 @@ func (m *graphPseudoManager) AddEvent(
 		)
 	}
 
-	if e.Type.Type() == types.ReceiveMessageType {
+	if e.Type.Type() == types.ReceiveMessageTypeS {
 		sendEvent, ok := events.Get(msg.GetSendEvent())
 		if !ok {
 			return false, types.NewError(
@@ -262,7 +262,7 @@ func (m *graphPseudoManager) AddEvent(
 	}
 	// logger.Debug(fmt.Sprintf("Graph Pseudo Manager: Added event: %#v", e))
 
-	if msg.Timeout && e.Type.Type() == types.ReceiveMessageType {
+	if msg.Timeout && e.Type.Type() == types.ReceiveMessageTypeS {
 		pairs := m.findPairs(e)
 		// logger.Debug(fmt.Sprintf("Graph Pseudo Manager: Done finding pairs for event: %#v", e))
 		for _, p := range pairs {
@@ -416,7 +416,7 @@ func (m *graphPseudoManager) checkPair(
 					)
 				}
 				var check *types.Event
-				if curE.Type.Type() == types.SendMessageType && message.Timeout {
+				if curE.Type.Type() == types.SendMessageTypeS && message.Timeout {
 					check, ok = events.Get(message.GetReceiveEvent())
 				} else {
 					check, ok = events.Get(curE.GetNext())
@@ -475,13 +475,13 @@ func (m *graphPseudoManager) updateLatest(e *types.Event) (uint, bool) {
 func (m *graphPseudoManager) updateSendsReceives(e *types.Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	if e.Type.Type() == types.SendMessageType {
+	if e.Type.Type() == types.SendMessageTypeS {
 		_, ok := m.sends[e.Replica]
 		if !ok {
 			m.sends[e.Replica] = make([]uint, 0)
 		}
 		m.sends[e.Replica] = append(m.sends[e.Replica], e.ID)
-	} else if e.Type.Type() == types.ReceiveMessageType {
+	} else if e.Type.Type() == types.ReceiveMessageTypeS {
 		_, ok := m.receives[e.Replica]
 		if !ok {
 			m.receives[e.Replica] = make([]uint, 0)

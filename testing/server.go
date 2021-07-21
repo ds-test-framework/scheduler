@@ -109,7 +109,10 @@ func (s *Server) Run() {
 
 		logger := s.logger.With(map[string]interface{}{"testcase": testCase.Name()})
 
-		s.ctx.SetRun(i)
+		s.ctx.SetRun(&types.Run{
+			Id:    i,
+			Label: testCase.Name(),
+		})
 		logger.Info("Starting test case")
 		s.driver.StartRun(testCase)
 		ok := s.driver.Ready()

@@ -200,6 +200,9 @@ func (d *testDriver) dispatch(replicaID types.ReplicaID) {
 	if !ok {
 		return
 	}
+	d.ctx.Publish(types.UnInterceptedMessage, &types.MessageWrapper{
+		Msg: msg,
+	})
 
 	if msg.Timeout {
 		go d.sendPeerTimeout(replica, msg.Type)

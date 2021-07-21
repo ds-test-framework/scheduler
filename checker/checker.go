@@ -80,7 +80,10 @@ func (c *Checker) run() {
 		"wait_time": strconv.Itoa(runTime),
 	}).Debug("Starting testing loop")
 	for i := 0; i < runs; i++ {
-		c.ctx.SetRun(i)
+		c.ctx.SetRun(&types.Run{
+			Id:    i,
+			Label: fmt.Sprintf("run_%d", i),
+		})
 		runObj, err := c.driver.StartRun(i)
 		if err != nil {
 			log.With(map[string]interface{}{

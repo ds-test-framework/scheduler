@@ -1,10 +1,15 @@
 package types
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type ReplicaLog struct {
-	Replica ReplicaID              `json:"id"`
-	Params  map[string]interface{} `json:"params"`
+	Replica   ReplicaID              `json:"id"`
+	Message   string                 `json:"message"`
+	Timestamp time.Time              `json:"timestamp"`
+	Params    map[string]interface{} `json:"params"`
 }
 
 func (l *ReplicaLog) Clone() Clonable {
@@ -20,13 +25,13 @@ func (l *ReplicaLog) Clone() Clonable {
 type LogStore struct {
 	curRun int
 	lock   *sync.Mutex
-	logs   map[int]map[ReplicaID][]map[string]interface{}
+	logs   map[int]map[ReplicaID][]*ReplicaLog
 }
 
 func NewLogStore() *LogStore {
 	return &LogStore{
 		curRun: 0,
-		logs:   make(map[int]map[ReplicaID][]map[string]interface{}),
+		logs:   make(map[int]map[ReplicaID][]*ReplicaLog),
 		lock:   new(sync.Mutex),
 	}
 }
@@ -34,7 +39,7 @@ func NewLogStore() *LogStore {
 func (s *LogStore) SetRun(i int) {
 	s.lock.Lock()
 	s.curRun = i
-	s.logs[s.curRun] = make(map[ReplicaID][]map[string]interface{})
+	s.logs[s.curRun] = make(map[ReplicaID][]*ReplicaLog)
 	s.lock.Unlock()
 }
 
@@ -44,14 +49,14 @@ func (s *LogStore) AddUpdate(l *ReplicaLog) {
 
 	_, ok := s.logs[s.curRun]
 	if !ok {
-		s.logs[s.curRun] = make(map[ReplicaID][]map[string]interface{})
+		s.logs[s.curRun] = make(map[ReplicaID][]*ReplicaLog)
 	}
 
 	_, ok = s.logs[s.curRun][l.Replica]
 	if !ok {
-		s.logs[s.curRun][l.Replica] = make([]map[string]interface{}, 0)
+		s.logs[s.curRun][l.Replica] = make([]*ReplicaLog, 0)
 	}
-	s.logs[s.curRun][l.Replica] = append(s.logs[s.curRun][l.Replica], l.Params)
+	s.logs[s.curRun][l.Replica] = append(s.logs[s.curRun][l.Replica], l)
 }
 
 type ReplicaStore struct {

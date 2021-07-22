@@ -198,6 +198,8 @@ func (s *GraphState) AddEvent(e *Event) {
 
 	curLatest, ok := s.latestEvent[e.Replica]
 	if ok {
+		curLatest.UpdateNext(e)
+		e.UpdatePrev(curLatest)
 		parents = append(parents, curLatest)
 	}
 	s.latestEvent[e.Replica] = e
@@ -260,9 +262,13 @@ func (h *GraphHelper) GetCurGraph() *EventGraph {
 	return h.graphRunMap[h.curRun].Graph
 }
 
-func (h *GraphHelper) GetGraph(run int) *EventGraph {
+func (h *GraphHelper) GetGraph(run int) (*EventGraph, bool) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	return h.graphRunMap[run].Graph
+	graphState, ok := h.graphRunMap[run]
+	if !ok {
+		return nil, false
+	}
+	return graphState.Graph, true
 }

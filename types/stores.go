@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
@@ -57,6 +58,20 @@ func (s *LogStore) AddUpdate(l *ReplicaLog) {
 		s.logs[s.curRun][l.Replica] = make([]*ReplicaLog, 0)
 	}
 	s.logs[s.curRun][l.Replica] = append(s.logs[s.curRun][l.Replica], l)
+}
+
+func (s *LogStore) GetLogs(run int, replica ReplicaID) ([]*ReplicaLog, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	runLogs, ok := s.logs[run]
+	if !ok {
+		return []*ReplicaLog{}, errors.New("run does not exist")
+	}
+	logs, ok := runLogs[replica]
+	if !ok {
+		return []*ReplicaLog{}, errors.New("replica does not exist for specified run")
+	}
+	return logs, nil
 }
 
 type ReplicaStore struct {

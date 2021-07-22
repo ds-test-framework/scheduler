@@ -61,7 +61,7 @@ func (srv *APIServer) HandleTimeout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-func (srv *APIServer) HandleReplica(c *gin.Context) {
+func (srv *APIServer) HandleReplicaPost(c *gin.Context) {
 	var replica types.Replica
 	if err := c.ShouldBindJSON(&replica); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
@@ -127,5 +127,66 @@ func (srv *APIServer) handleRun(c *gin.Context) {
 }
 
 func (srv *APIServer) handleRunLog(c *gin.Context) {
+	run := c.Param("run")
+	if run == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing run param"})
+		return
+	}
+	runI, err := strconv.Atoi(run)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid run param"})
+		return
+	}
+	replica := c.Param("replica")
+	if replica == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing replica param"})
+		return
+	}
 
+	logs, err := srv.ctx.Logs.GetLogs(runI, types.ReplicaID(replica))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"logs": logs})
+}
+
+func (srv *APIServer) handleReplicas(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"replicas": srv.ctx.Replicas.Iter(),
+	})
+}
+
+func (srv *APIServer) handleReplicaGet(c *gin.Context) {
+	replicaID, ok := c.Params.Get("replica")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing replica param"})
+		return
+	}
+	replica, ok := srv.ctx.Replicas.GetReplica(types.ReplicaID(replicaID))
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "replica id does not exist"})
+		return
+	}
+	c.JSON(http.StatusOK, replica)
+}
+
+func (srv *APIServer) handleRunGraph(c *gin.Context) {
+	runS, ok := c.Params.Get("run")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing run param"})
+		return
+	}
+	runI, err := strconv.Atoi(runS)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid run param"})
+		return
+	}
+
+	graph, ok := srv.ctx.EventGraph.GetGraph(runI)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run does not exist"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"graph": graph})
 }

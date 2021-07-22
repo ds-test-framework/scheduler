@@ -44,10 +44,13 @@ func NewAPIServer(ctx *types.Context) *APIServer {
 	router.POST("/timeout", server.HandleTimeout)
 	router.POST("/log", server.HandleLog)
 	router.POST("/event", server.HandleEvent)
-	router.POST("/replica", server.HandleReplica)
+	router.POST("/replica", server.HandleReplicaPost)
 
 	router.GET("/runs", server.handleRun)
-	router.GET("/run/:run/logs", server.handleRunLog)
+	router.GET("/replicas", server.handleReplicas)
+	router.GET("/replicas/:replica", server.handleReplicaGet)
+	router.GET("/run/:run/:replica/logs", server.handleRunLog)
+	router.GET("/run/:run/graph", server.handleRunGraph)
 
 	server.router = router
 	server.server = &http.Server{

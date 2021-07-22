@@ -169,10 +169,7 @@ func (g *EventGraph) GetEventNode(eid uint) (*Node, bool) {
 	return nil, ok
 }
 
-type edge struct {
-	From uint `json:"from"`
-	To   uint `json:"to"`
-}
+type edge [2]uint
 
 type matrix struct {
 	Nodes []*Node `json:"nodes"`
@@ -188,10 +185,7 @@ func (g *EventGraph) MarshalJSON() ([]byte, error) {
 	}
 	for _, n := range allnodes {
 		for _, child := range n.Children.Iter() {
-			m.Edges = append(m.Edges, &edge{
-				From: n.ID,
-				To:   child.ID,
-			})
+			m.Edges = append(m.Edges, &edge{n.ID, child.ID})
 		}
 	}
 	return json.Marshal(m)

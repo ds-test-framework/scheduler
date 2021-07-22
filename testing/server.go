@@ -59,7 +59,7 @@ const (
 )
 
 type Server struct {
-	TestCases []TestCase
+	TestCases []*TestCase
 	driver    *testDriver
 	apiServer *apiserver.APIServer
 	logger    *log.Logger
@@ -71,7 +71,7 @@ type Server struct {
 	stopO  *sync.Once
 }
 
-func NewTestServer(config ServerConfig, testcases []TestCase) (*Server, error) {
+func NewTestServer(config ServerConfig, testcases []*TestCase) (*Server, error) {
 	config.setDefaults()
 	ctxConfig := config.viperConfig()
 
@@ -107,11 +107,11 @@ func (s *Server) Run() {
 	s.logger.Info("Starting server main loop")
 	for i, testCase := range s.TestCases {
 
-		logger := s.logger.With(map[string]interface{}{"testcase": testCase.Name()})
+		logger := s.logger.With(map[string]interface{}{"testcase": testCase.Name})
 
 		s.ctx.SetRun(&types.Run{
 			Id:    i,
-			Label: testCase.Name(),
+			Label: testCase.Name,
 		})
 		logger.Info("Starting test case")
 		s.driver.StartRun(testCase)
@@ -120,27 +120,23 @@ func (s *Server) Run() {
 			logger.Info("Replicas failed to intialize, test case did not start")
 			continue
 		}
-
-		ctx, err := testCase.Initialize(s.ctx.Replicas, logger)
-		if err != nil {
-			logger.Info("Testcase failed to initialize")
-			continue
-		}
+		testCase = testCase.WithContext(s.ctx)
+		ctx := testCase.Run()
 
 		select {
-		case <-ctx.Done():
+		case <-ctx.Done:
 			logger.Debug("Testcase indicated done")
-		case <-time.After(ctx.Timeout()):
+		case <-time.After(ctx.Timeout):
 			logger.Debug("Testcase timeout reached")
 		case <-s.stopCh:
 			s.logger.Debug("Stopping server main loop prematurely")
 			return
 		}
 
-		err = testCase.Assert()
-		s.resultMap.add(testCase.Name(), err)
-		if err != nil {
-			logger.With(map[string]interface{}{"error": err.Error()}).Info("Testcase failed")
+		ok = testCase.Assert()
+		s.resultMap.add(testCase.Name, ok)
+		if !ok {
+			logger.Info("Testcase failed")
 			continue
 		}
 		logger.Info("Testcase succeded")

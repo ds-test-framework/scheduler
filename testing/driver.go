@@ -3,7 +3,6 @@ package testing
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"sync"
 
 	"github.com/ds-test-framework/scheduler/algos/common"
@@ -22,7 +21,7 @@ type testDriver struct {
 	stopCh       chan bool
 	totalPeers   int
 
-	curTestCase TestCase
+	curTestCase *TestCase
 	mtx         *sync.Mutex
 
 	logger *log.Logger
@@ -60,8 +59,8 @@ func (d *testDriver) Stop() {
 	close(d.stopCh)
 }
 
-func (d *testDriver) StartRun(t TestCase) {
-	d.logger.With(map[string]interface{}{"testcase": t.Name()}).Debug("Setting up driver for test case")
+func (d *testDriver) StartRun(t *TestCase) {
+	d.logger.With(map[string]interface{}{"testcase": t.Name}).Debug("Setting up driver for test case")
 
 	d.msgStore.Reset()
 	d.ctx.Replicas.ResetReady()
@@ -79,7 +78,7 @@ func (d *testDriver) StopRun() {
 	d.curTestCase = nil
 	d.mtx.Unlock()
 
-	d.logger.With(map[string]interface{}{"testcase": t.Name()}).Debug("Tearing down driver for test case")
+	d.logger.With(map[string]interface{}{"testcase": t.Name}).Debug("Tearing down driver for test case")
 }
 
 func (m *testDriver) Ready() bool {
@@ -130,59 +129,59 @@ func (d *testDriver) pollAPI() {
 }
 
 func (d *testDriver) handleMessage(event types.ContextEvent) {
-	msg, ok := event.Data.(*types.MessageWrapper)
-	if !ok {
-		return
-	}
-	d.msgStore.Add(msg.Msg)
-	d.mtx.Lock()
-	testCase := d.curTestCase
-	d.mtx.Unlock()
-	if testCase == nil {
-		return
-	}
+	// msg, ok := event.Data.(*types.MessageWrapper)
+	// if !ok {
+	// 	return
+	// }
+	// d.msgStore.Add(msg.Msg)
+	// d.mtx.Lock()
+	// testCase := d.curTestCase
+	// d.mtx.Unlock()
+	// if testCase == nil {
+	// 	return
+	// }
 
-	pass, more := testCase.HandleMessage(msg.Msg.Clone())
-	if pass {
-		d.msgStore.Mark(msg.Msg.ID)
-	}
-	for _, msgN := range more {
-		if msgN.ID == "" {
-			msgN.ID = strconv.Itoa(d.ctx.IDGen.Next())
-		}
-		if !d.msgStore.Exists(msgN.ID) {
-			d.msgStore.Add(msgN)
-		}
-		d.msgStore.Mark(msgN.ID)
-	}
+	// pass, more := testCase.HandleMessage(msg.Msg.Clone())
+	// if pass {
+	// 	d.msgStore.Mark(msg.Msg.ID)
+	// }
+	// for _, msgN := range more {
+	// 	if msgN.ID == "" {
+	// 		msgN.ID = strconv.Itoa(d.ctx.IDGen.Next())
+	// 	}
+	// 	if !d.msgStore.Exists(msgN.ID) {
+	// 		d.msgStore.Add(msgN)
+	// 	}
+	// 	d.msgStore.Mark(msgN.ID)
+	// }
 }
 
 func (d *testDriver) handleLogMessage(event types.ContextEvent) {
-	log, ok := event.Data.(*types.ReplicaLog)
-	if !ok {
-		return
-	}
-	d.mtx.Lock()
-	testCase := d.curTestCase
-	d.mtx.Unlock()
-	if testCase == nil {
-		return
-	}
-	testCase.HandleLogMessage(log)
+	// log, ok := event.Data.(*types.ReplicaLog)
+	// if !ok {
+	// 	return
+	// }
+	// d.mtx.Lock()
+	// testCase := d.curTestCase
+	// d.mtx.Unlock()
+	// if testCase == nil {
+	// 	return
+	// }
+	// testCase.HandleLogMessage(log)
 }
 
 func (d *testDriver) handleEventUpdate(event types.ContextEvent) {
-	e, ok := event.Data.(*types.Event)
-	if !ok {
-		return
-	}
-	d.mtx.Lock()
-	testCase := d.curTestCase
-	d.mtx.Unlock()
-	if testCase == nil {
-		return
-	}
-	testCase.HandleEvent(e)
+	// e, ok := event.Data.(*types.Event)
+	// if !ok {
+	// 	return
+	// }
+	// d.mtx.Lock()
+	// testCase := d.curTestCase
+	// d.mtx.Unlock()
+	// if testCase == nil {
+	// 	return
+	// }
+	// testCase.HandleEvent(e)
 }
 
 func (d *testDriver) dispatch(replicaID types.ReplicaID) {

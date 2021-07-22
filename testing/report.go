@@ -9,7 +9,7 @@ type resultMap struct {
 	success int
 	total   int
 
-	m map[string]error
+	m map[string]bool
 
 	mtx *sync.Mutex
 }
@@ -18,20 +18,20 @@ func newResultMap() *resultMap {
 	return &resultMap{
 		success: 0,
 		total:   0,
-		m:       make(map[string]error),
+		m:       make(map[string]bool),
 		mtx:     new(sync.Mutex),
 	}
 }
 
-func (rm *resultMap) add(name string, err error) {
+func (rm *resultMap) add(name string, ok bool) {
 	rm.mtx.Lock()
 	defer rm.mtx.Unlock()
 
 	rm.total = rm.total + 1
-	if err == nil {
+	if ok {
 		rm.success = rm.success + 1
 	} else {
-		rm.m[name] = err
+		rm.m[name] = ok
 	}
 }
 
@@ -48,11 +48,5 @@ func (rm *resultMap) summary() string {
 	defer rm.mtx.Unlock()
 
 	str += fmt.Sprintf("Total: %d, Success: %d, Failed: %d\n", rm.total, rm.success, rm.total-rm.success)
-	if rm.total > rm.success {
-		str += "Failed test cases:\n"
-		for name, err := range rm.m {
-			str += fmt.Sprintf("%s Error: %s\n", name, err.Error())
-		}
-	}
 	return str
 }

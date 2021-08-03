@@ -37,6 +37,7 @@ func NewAPIServer(ctx *types.Context) *APIServer {
 		ctx:  ctx,
 		addr: config.GetString("addr"),
 	}
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(server.logMiddleware)
 
@@ -87,10 +88,14 @@ func (a *APIServer) logMiddleware(c *gin.Context) {
 
 func (a *APIServer) Start() {
 	go func() {
+		a.logger.With(log.LogParams{
+			"addr": a.addr,
+		}).Info("API server starting!")
 		if err := a.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.logger.With(log.LogParams{
 				"addr": a.addr,
-			}).Info("API server started!")
+				"err":  err,
+			}).Fatal("API server closed!")
 		}
 	}()
 }

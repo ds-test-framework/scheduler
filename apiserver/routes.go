@@ -12,8 +12,10 @@ import (
 )
 
 func (srv *APIServer) HandleMessage(c *gin.Context) {
+	srv.logger.Info("Handling message")
 	var msg types.Message
 	if err := c.ShouldBindJSON(&msg); err != nil {
+		srv.logger.Info("Bad message")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}
@@ -64,6 +66,7 @@ func (srv *APIServer) HandleTimeout(c *gin.Context) {
 func (srv *APIServer) HandleReplicaPost(c *gin.Context) {
 	var replica types.Replica
 	if err := c.ShouldBindJSON(&replica); err != nil {
+		srv.logger.Info("Bad replica request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}

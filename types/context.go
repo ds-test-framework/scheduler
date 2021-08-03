@@ -2,7 +2,6 @@ package types
 
 import (
 	"sync"
-	"time"
 
 	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/util"
@@ -143,34 +142,16 @@ func (c *Context) Publish(t ContextEventType, data Clonable) {
 		Type: t,
 	}
 
+	switch t {
+	case EventMessage:
+		event := data.(*Event)
+		c.EventGraph.AddEvent(event)
+	}
+
 	for _, c := range chans {
 		go func(e ContextEvent, ch chan ContextEvent) {
 			ch <- e
 		}(event.Clone(), c)
-	}
-
-	switch t {
-	case InterceptedMessage:
-		msgW := data.(*MessageWrapper)
-		eventT := NewSendMessageEventType(msgW.Msg)
-		c.EventGraph.AddEvent(NewEvent(
-			uint(c.IDGen.Next()),
-			msgW.Msg.From,
-			eventT,
-			time.Now().Unix(),
-		))
-	case UnInterceptedMessage:
-		msgW := data.(*MessageWrapper)
-		eventT := NewReceiveMessageEventType(msgW.Msg)
-		c.EventGraph.AddEvent(NewEvent(
-			uint(c.IDGen.Next()),
-			msgW.Msg.To,
-			eventT,
-			time.Now().Unix(),
-		))
-	case EventMessage:
-		event := data.(*Event)
-		c.EventGraph.AddEvent(event)
 	}
 }
 

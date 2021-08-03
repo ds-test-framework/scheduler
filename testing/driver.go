@@ -3,7 +3,9 @@ package testing
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/ds-test-framework/scheduler/algos/common"
 	"github.com/ds-test-framework/scheduler/log"
@@ -129,18 +131,27 @@ func (d *testDriver) pollAPI() {
 }
 
 func (d *testDriver) handleMessage(event types.ContextEvent) {
-	// msg, ok := event.Data.(*types.MessageWrapper)
-	// if !ok {
-	// 	return
-	// }
-	// d.msgStore.Add(msg.Msg)
-	// d.mtx.Lock()
-	// testCase := d.curTestCase
-	// d.mtx.Unlock()
-	// if testCase == nil {
-	// 	return
-	// }
+	msg, ok := event.Data.(*types.MessageWrapper)
+	if !ok {
+		return
+	}
+	d.msgStore.Add(msg.Msg)
 
+	d.mtx.Lock()
+	testCase := d.curTestCase
+	d.mtx.Unlock()
+	if testCase == nil {
+		return
+	}
+	testCase.MPool.Add(msg.Msg)
+
+	eventT := types.NewSendMessageEventType(msg.Msg)
+	d.ctx.Publish(types.EventMessage, types.NewEvent(
+		uint(d.ctx.IDGen.Next()),
+		msg.Msg.From,
+		eventT,
+		time.Now().Unix(),
+	))
 	// pass, more := testCase.HandleMessage(msg.Msg.Clone())
 	// if pass {
 	// 	d.msgStore.Mark(msg.Msg.ID)
@@ -171,17 +182,26 @@ func (d *testDriver) handleLogMessage(event types.ContextEvent) {
 }
 
 func (d *testDriver) handleEventUpdate(event types.ContextEvent) {
-	// e, ok := event.Data.(*types.Event)
-	// if !ok {
-	// 	return
-	// }
-	// d.mtx.Lock()
-	// testCase := d.curTestCase
-	// d.mtx.Unlock()
-	// if testCase == nil {
-	// 	return
-	// }
-	// testCase.HandleEvent(e)
+	e, ok := event.Data.(*types.Event)
+	if !ok {
+		return
+	}
+	d.mtx.Lock()
+	testCase := d.curTestCase
+	d.mtx.Unlock()
+	if testCase == nil {
+		return
+	}
+	msgs := testCase.Step(e)
+	for _, m := range msgs {
+		if m.ID == "" {
+			m.ID = strconv.Itoa(d.ctx.IDGen.Next())
+		}
+		if !d.msgStore.Exists(m.ID) {
+			d.msgStore.Add(m)
+		}
+		d.msgStore.Mark(m.ID)
+	}
 }
 
 func (d *testDriver) dispatch(replicaID types.ReplicaID) {
@@ -199,9 +219,17 @@ func (d *testDriver) dispatch(replicaID types.ReplicaID) {
 	if !ok {
 		return
 	}
+
+	eventT := types.NewReceiveMessageEventType(msg)
 	d.ctx.Publish(types.UnInterceptedMessage, &types.MessageWrapper{
 		Msg: msg,
 	})
+	d.ctx.Publish(types.EventMessage, types.NewEvent(
+		uint(d.ctx.IDGen.Next()),
+		msg.To,
+		eventT,
+		time.Now().Unix(),
+	))
 
 	if msg.Timeout {
 		go d.sendPeerTimeout(replica, msg.Type)

@@ -18,7 +18,7 @@ type EventWrapper struct {
 // Condition Abstracts a predicate over the cur graph state
 type Condition interface {
 	// Should return true if the predicate is satisfied, false otherwise
-	Check(*EventWrapper) bool
+	Check(*EventWrapper, *VarSet) bool
 }
 
 // Transition indicates an edge out of a state
@@ -48,7 +48,7 @@ func NewState(label string, action Action) *State {
 
 // HandleEvent checks if the event allows for a transition from the given state
 // Returns true if the current new event allows the state machine to transition, false otherwise
-func (s *State) handleEvent(ctx *types.Context, e *types.Event) bool {
+func (s *State) handleEvent(ctx *types.Context, e *types.Event, v *VarSet) bool {
 	var wg sync.WaitGroup
 	results := make(chan *State, len(s.Transitions))
 
@@ -59,7 +59,7 @@ func (s *State) handleEvent(ctx *types.Context, e *types.Event) bool {
 	for _, t := range s.Transitions {
 		wg.Add(1)
 		go func(transition Transition) {
-			if transition.Cond.Check(eventW) {
+			if transition.Cond.Check(eventW, v) {
 				results <- transition.To
 			} else {
 				results <- nil
@@ -77,11 +77,11 @@ func (s *State) handleEvent(ctx *types.Context, e *types.Event) bool {
 	return s.Next != nil
 }
 
-func (s *State) Step(ctx *types.Context, e *types.Event, mPool *MessagePool) ([]*types.Message, bool) {
+func (s *State) Step(ctx *types.Context, e *types.Event, mPool *MessagePool, v *VarSet) ([]*types.Message, bool) {
 	return s.Action.Step(&EventWrapper{
 		Event: e,
 		Graph: ctx.EventGraph.GetCurGraph(),
-	}, mPool), s.handleEvent(ctx, e)
+	}, mPool, v), s.handleEvent(ctx, e, v)
 }
 
 func (s *State) Upon(cond Condition, next *State) *State {

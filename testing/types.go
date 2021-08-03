@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/types"
 )
 
@@ -41,25 +42,53 @@ func (p *MessagePool) Add(m *types.Message) bool {
 	return true
 }
 
+func (p *MessagePool) PickAll() []*types.Message {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	all := make([]*types.Message, len(p.messages))
+	for _, m := range p.messages {
+		all = append(all, m)
+	}
+
+	for k := range p.messages {
+		delete(p.messages, k)
+	}
+	return all
+}
+
+func (p *MessagePool) Reset() {
+	p.lock.Lock()
+	p.messages = make(map[string]*types.Message)
+	p.lock.Unlock()
+}
+
 type TestCase struct {
 	ctx      *types.Context
 	Timeout  time.Duration
 	states   map[string]*State
 	rCtx     *TestCaseCtx
 	curState *State
+	varSet   *VarSet
+	MPool    *MessagePool
 	Name     string
+	Logger   *log.Logger
 }
 
 func NewTestCase(name string, timeout time.Duration) *TestCase {
+	startState := NewState(startLabel, &AllowAllAction{})
 	t := &TestCase{
 		Name:     name,
 		Timeout:  timeout,
 		states:   make(map[string]*State),
-		curState: nil,
+		curState: startState,
 		ctx:      nil,
+		varSet:   NewVarSet(),
 		rCtx:     NewTestCaseCtx(timeout),
+		MPool:    NewMessagePool(),
+		Logger:   nil,
 	}
-	t.states[startLabel] = NewState(startLabel, &AllowAllAction{})
+	t.states[startLabel] = startState
 	t.states[successLabel] = NewState(successLabel, &AllowAllAction{})
 	t.states[failLabel] = NewState(failLabel, &AllowAllAction{})
 	return t
@@ -75,6 +104,14 @@ func (t *TestCase) StartState() *State {
 	return t.states[startLabel]
 }
 
+func (t *TestCase) SuccessState() *State {
+	return t.states[successLabel]
+}
+
+func (t *TestCase) FailState() *State {
+	return t.states[failLabel]
+}
+
 func (t *TestCase) CreateState(label string, action Action) *State {
 	state := NewState(label, action)
 	t.states[startLabel] = state
@@ -83,6 +120,9 @@ func (t *TestCase) CreateState(label string, action Action) *State {
 
 func (t *TestCase) WithContext(ctx *types.Context) *TestCase {
 	t.ctx = ctx
+	t.Logger = ctx.Logger.With(log.LogParams{
+		"testcase": t.Name,
+	})
 	return t
 }
 
@@ -111,8 +151,8 @@ func (t *TestCase) Run() *TestCaseCtx {
 	return t.rCtx
 }
 
-func (t *TestCase) Step(e *types.Event, mPool *MessagePool) []*types.Message {
-	messages, transitioned := t.curState.Step(t.ctx, e, mPool)
+func (t *TestCase) Step(e *types.Event) []*types.Message {
+	messages, transitioned := t.curState.Step(t.ctx, e, t.MPool, t.varSet)
 	if transitioned {
 		t.curState = t.curState.Next
 		if t.curState.Label == successLabel || t.curState.Label == failLabel {

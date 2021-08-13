@@ -3,8 +3,8 @@ package log
 import (
 	"os"
 
+	"github.com/ds-test-framework/scheduler/config"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 var DefaultLogger *Logger
@@ -17,17 +17,16 @@ type Logger struct {
 	file *os.File
 }
 
-func NewLogger(c *viper.Viper) *Logger {
+func NewLogger(c config.LogConfig) *Logger {
 	l := logrus.New()
-	if c.GetString("format") == "json" {
+	if c.Format == "json" {
 		l.SetFormatter(&logrus.JSONFormatter{})
 	}
-	path := c.GetString("path")
 
 	var file *os.File
 
-	if path != "" {
-		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if c.Path != "" {
+		file, err := os.OpenFile(c.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if err == nil {
 			l.SetOutput(file)
 		}
@@ -37,8 +36,6 @@ func NewLogger(c *viper.Viper) *Logger {
 		file:  file,
 	}
 }
-
-var logFile *os.File = nil
 
 // Debug logs a debug message
 func Debug(s string) {
@@ -120,9 +117,9 @@ func (l *Logger) Destroy() {
 }
 
 // Init initializes the default logger with a log path if specified
-func Init(c *viper.Viper, level string) {
+func Init(c config.LogConfig) {
 	DefaultLogger = NewLogger(c)
-	DefaultLogger.SetLevel(level)
+	DefaultLogger.SetLevel(c.Level)
 }
 
 // Destroy closes the log file

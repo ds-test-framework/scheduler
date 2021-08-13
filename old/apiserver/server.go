@@ -1,12 +1,11 @@
 package apiserver
 
 import (
-	goctx "context"
+	"context"
 	"errors"
 	"net/http"
 	"time"
 
-	"github.com/ds-test-framework/scheduler/context"
 	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/types"
 	"github.com/ds-test-framework/scheduler/util"
@@ -16,34 +15,43 @@ import (
 const DefaultAddr = "0.0.0.0:7074"
 
 type APIServer struct {
+	logger *log.Logger
 	router *gin.Engine
-	ctx    *context.RootContext
-	gen    *util.Counter
+	ctx    *types.Context
+	gen    *util.IDGenerator
 
 	server *http.Server
-	addr   string
 
-	*types.BaseService
+	addr string
 }
 
-func NewAPIServer(ctx *context.RootContext) *APIServer {
+func NewAPIServer(ctx *types.Context) *APIServer {
+	config := ctx.Config("transport")
+	config.SetDefault("addr", DefaultAddr)
 
 	server := &APIServer{
-		gen:         ctx.Counter,
-		ctx:         ctx,
-		addr:        ctx.Config.APIServerAddr,
-		BaseService: types.NewBaseService("APIServer", ctx.Logger),
+		logger: ctx.Logger.With(log.LogParams{
+			"service": "api-server",
+		}),
+		gen:  ctx.IDGen,
+		ctx:  ctx,
+		addr: config.GetString("addr"),
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(server.logMiddleware)
 
 	router.POST("/message", server.HandleMessage)
+	router.POST("/timeout", server.HandleTimeout)
+	router.POST("/log", server.HandleLog)
 	router.POST("/event", server.HandleEvent)
 	router.POST("/replica", server.HandleReplicaPost)
 
+	router.GET("/runs", server.handleRun)
 	router.GET("/replicas", server.handleReplicas)
 	router.GET("/replicas/:replica", server.handleReplicaGet)
+	router.GET("/run/:run/:replica/logs", server.handleRunLog)
+	router.GET("/run/:run/graph", server.handleRunGraph)
 
 	server.router = router
 	server.server = &http.Server{
@@ -66,7 +74,7 @@ func (a *APIServer) logMiddleware(c *gin.Context) {
 	if raw != "" {
 		path = path + "?" + raw
 	}
-	a.Logger.With(log.LogParams{
+	a.logger.With(log.LogParams{
 		"timestamp":   end,
 		"latency":     end.Sub(start).String(),
 		"client_ip":   c.ClientIP(),
@@ -79,13 +87,12 @@ func (a *APIServer) logMiddleware(c *gin.Context) {
 }
 
 func (a *APIServer) Start() {
-	a.StartRunning()
 	go func() {
-		a.Logger.With(log.LogParams{
+		a.logger.With(log.LogParams{
 			"addr": a.addr,
 		}).Info("API server starting!")
 		if err := a.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			a.Logger.With(log.LogParams{
+			a.logger.With(log.LogParams{
 				"addr": a.addr,
 				"err":  err,
 			}).Fatal("API server closed!")
@@ -94,11 +101,10 @@ func (a *APIServer) Start() {
 }
 
 func (a *APIServer) Stop() {
-	a.StopRunning()
-	ctx, cancel := goctx.WithTimeout(goctx.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := a.server.Shutdown(ctx); err != nil {
-		a.Logger.Error("API server focefully shutdown")
+		a.logger.Error("API server focefully shutdown")
 	}
-	a.Logger.Info("API server stopped!")
+	a.logger.Info("API server stopped!")
 }

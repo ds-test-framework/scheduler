@@ -1,192 +1,104 @@
 package types
 
-import (
-	"encoding/json"
-	"sync"
-)
+import "sync"
 
-type NodeSet struct {
-	nodes map[uint]*Node
-	lock  *sync.Mutex
+type EventNode struct {
+	*Event
+	prev        *EventNode
+	next        *EventNode
+	Parents     *EventNodeSet
+	Children    *EventNodeSet
+	Descendants *EventNodeSet
+	Ancestors   *EventNodeSet
+	lock        *sync.Mutex
 }
 
-func NewNodeSet() *NodeSet {
-	return &NodeSet{
-		nodes: make(map[uint]*Node),
-		lock:  new(sync.Mutex),
-	}
-}
-
-func (s *NodeSet) Add(n *Node) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.nodes[n.ID] = n
-}
-
-func (s *NodeSet) Get(id uint) *Node {
-	s.lock.Lock()
-	n, ok := s.nodes[id]
-	s.lock.Unlock()
-	if !ok {
-		return nil
-	}
-	return n
-}
-
-func (s *NodeSet) Iter() []*Node {
-	result := make([]*Node, len(s.nodes))
-	i := 0
-	s.lock.Lock()
-	for _, n := range s.nodes {
-		result[i] = n
-		i++
-	}
-	s.lock.Unlock()
-	return result
-}
-
-func (s *NodeSet) Union(n *NodeSet) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for _, node := range n.Iter() {
-		s.nodes[node.ID] = node
-	}
-}
-
-func (s *NodeSet) Has(id uint) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	_, ok := s.nodes[id]
-	return ok
-}
-
-type Node struct {
-	ID          uint        `json:"id"`
-	Event       *Event      `json:"event"`
-	Parents     *NodeSet    `json:"-"`
-	Children    *NodeSet    `json:"-"`
-	Ancestors   *NodeSet    `json:"-"`
-	Descendants *NodeSet    `json:"-"`
-	lock        *sync.Mutex `json:"-"`
-}
-
-func NewNode(e *Event, parents []*Node) *Node {
-	n := &Node{
-		ID:          e.ID,
+func NewEventNode(e *Event) *EventNode {
+	return &EventNode{
 		Event:       e,
-		Parents:     NewNodeSet(),
-		Children:    NewNodeSet(),
-		Ancestors:   NewNodeSet(),
-		Descendants: NewNodeSet(),
-		lock:        new(sync.Mutex),
-	}
-
-	for _, p := range parents {
-		n.Parents.Add(p)
-		p.Children.Add(n)
-		n.Ancestors.Add(p)
-		n.Ancestors.Union(p.Ancestors)
-	}
-
-	for _, a := range n.Ancestors.Iter() {
-		a.Descendants.Add(n)
-	}
-	return n
-}
-
-func (n *Node) IsDescendant(o *Node) bool {
-	return n.Descendants.Has(o.ID)
-}
-
-func (n *Node) Le(o *Node) bool {
-	if o.ID == n.ID {
-		return true
-	}
-	return n.IsDescendant(o)
-}
-
-func (n *Node) Lt(o *Node) bool {
-	return n.IsDescendant(o)
-}
-
-func (n *Node) Eq(o *Node) bool {
-	return n.ID == o.ID
-}
-
-func (n *Node) Clone() *Node {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	return &Node{
-		ID:          n.ID,
-		Event:       n.Event,
-		Parents:     NewNodeSet(),
-		Children:    NewNodeSet(),
-		Ancestors:   NewNodeSet(),
-		Descendants: NewNodeSet(),
+		prev:        nil,
+		next:        nil,
+		Parents:     NewEventNodeSet(),
+		Children:    NewEventNodeSet(),
+		Ancestors:   NewEventNodeSet(),
+		Descendants: NewEventNodeSet(),
 		lock:        new(sync.Mutex),
 	}
 }
 
-func (n *Node) UpdateEvent(e *Event) {
+func (n *EventNode) SetPrev(prev *EventNode) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	n.Event = e
-	n.ID = e.ID
+	n.prev = prev
 }
 
-type EventGraph struct {
-	Nodes *NodeSet
-	Roots *NodeSet
+func (n *EventNode) Prev() *EventNode {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	return n.prev
 }
 
-func NewEventGraph() *EventGraph {
-	return &EventGraph{
-		Nodes: NewNodeSet(),
-		Roots: NewNodeSet(),
+func (n *EventNode) SetNext(next *EventNode) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.next = next
+}
+
+func (n *EventNode) Next() *EventNode {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	return n.next
+}
+
+func (n *EventNode) AddParents(parents []*EventNode) {
+	for _, parent := range parents {
+		n.Parents.Add(parent)
+		parent.Children.Add(n)
+
+		n.Ancestors.Add(parent)
+		n.Ancestors.Union(parent.Ancestors)
+	}
+	for _, ancestor := range n.Ancestors.Iter() {
+		ancestor.Descendants.Add(n)
 	}
 }
 
-func (g *EventGraph) AddEvent(e *Event, parents []*Event) {
-	parentNodes := make([]*Node, 0)
-	for _, p := range parents {
-		if g.Nodes.Has(p.ID) {
-			parentNodes = append(parentNodes, g.Nodes.Get(p.ID))
+type EventDAG struct {
+	nodes   *EventNodeSet
+	strands map[ReplicaID]*EventNode
+	lock    *sync.Mutex
+}
+
+func NewEventDag() *EventDAG {
+	return &EventDAG{
+		nodes:   NewEventNodeSet(),
+		strands: make(map[ReplicaID]*EventNode),
+		lock:    new(sync.Mutex),
+	}
+}
+
+func (d *EventDAG) AddNode(e *Event, parents []*Event) {
+	parentNodes := make([]*EventNode, 0)
+	for _, parent := range parents {
+		if d.nodes.Has(parent.ID) {
+			parentNodes = append(parentNodes, d.nodes.Get(parent.ID))
 		}
 	}
 
-	node := NewNode(e, parentNodes)
-	if len(parents) == 0 {
-		g.Roots.Add(node)
+	node := NewEventNode(e)
+	node.AddParents(parentNodes)
+
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	_, ok := d.strands[e.Replica]
+	if !ok {
+		d.strands[e.Replica] = node
 	}
-	g.Nodes.Add(node)
 }
 
-func (g *EventGraph) GetEventNode(eid uint) (*Node, bool) {
-	ok := g.Nodes.Has(eid)
-	if ok {
-		return g.Nodes.Get(eid), ok
-	}
-	return nil, ok
-}
-
-type edge [2]uint
-
-type matrix struct {
-	Nodes []*Node `json:"nodes"`
-	Edges []*edge `json:"edges"`
-}
-
-// Adjacency matrix representation is encoded
-func (g *EventGraph) MarshalJSON() ([]byte, error) {
-	allnodes := g.Nodes.Iter()
-	m := &matrix{
-		Nodes: allnodes,
-		Edges: make([]*edge, 0),
-	}
-	for _, n := range allnodes {
-		for _, child := range n.Children.Iter() {
-			m.Edges = append(m.Edges, &edge{n.ID, child.ID})
-		}
-	}
-	return json.Marshal(m)
+func (d *EventDAG) GetStrand(replica ReplicaID) (*EventNode, bool) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	head, ok := d.strands[replica]
+	return head, ok
 }

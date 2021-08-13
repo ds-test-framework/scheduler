@@ -1,177 +1,187 @@
 package types
 
 import (
-	"fmt"
-	"strings"
 	"sync"
+
+	"github.com/ds-test-framework/scheduler/log"
 )
 
 type EventType interface {
-	Type() string
 	Clone() EventType
+	Type() string
 	String() string
 }
 
-const (
-	SendMessageTypeS    = "SendMessage"
-	ReceiveMessageTypeS = "ReceiveMessage"
-	ReplicaEventTypeS   = "ReplicaEvent"
-)
-
-type SendMessageEventType struct {
-	msg *Message
-}
-
-func NewSendMessageEventType(msg *Message) *SendMessageEventType {
-	return &SendMessageEventType{
-		msg: msg,
-	}
-}
-func (s *SendMessageEventType) Message() *Message {
-	return s.msg
-}
-func (s *SendMessageEventType) Type() string {
-	return SendMessageTypeS
-}
-func (s *SendMessageEventType) Clone() EventType {
-	return &SendMessageEventType{
-		msg: s.msg.Clone(),
-	}
-}
-func (s *SendMessageEventType) String() string {
-	return "SendMessage(" + s.msg.ID + ")"
-}
-
-type ReceiveMessageEventType struct {
-	msg *Message
-}
-
-func NewReceiveMessageEventType(msg *Message) *ReceiveMessageEventType {
-	return &ReceiveMessageEventType{
-		msg: msg,
-	}
-}
-func (r *ReceiveMessageEventType) Message() *Message {
-	return r.msg
-}
-func (r *ReceiveMessageEventType) Type() string {
-	return ReceiveMessageTypeS
-}
-func (r *ReceiveMessageEventType) Clone() EventType {
-	return &ReceiveMessageEventType{
-		msg: r.msg.Clone(),
-	}
-}
-func (r *ReceiveMessageEventType) String() string {
-	return "ReceiveMessage(" + r.msg.ID + ")"
-}
-
-type ReplicaEventType struct {
-	Params map[string]string `json:"params"`
-	T      string            `json:"type"`
-}
-
-func NewReplicaEventType(t string, params map[string]string) *ReplicaEventType {
-	return &ReplicaEventType{
-		Params: params,
-		T:      t,
-	}
-}
-func (r *ReplicaEventType) Type() string {
-	return ReplicaEventTypeS + "(" + r.T + ")"
-}
-func (r *ReplicaEventType) Clone() EventType {
-	return &ReplicaEventType{
-		Params: r.Params,
-		T:      r.T,
-	}
-}
-func (r *ReplicaEventType) String() string {
-	str := r.T + " {"
-	paramS := make([]string, len(r.Params))
-	for k, v := range r.Params {
-		paramS = append(paramS, fmt.Sprintf(" %s = %s", k, v))
-	}
-	str += strings.Join(paramS, ",")
-	str += " }"
-	return str
-}
-
-// Event encapsulates a message send/receive all necessary information
 type Event struct {
-	ID        uint        `json:"id"`
-	TypeS     string      `json:"type"`
-	Type      EventType   `json:"-"`
-	Timestamp int64       `json:"timestamp"`
-	Replica   ReplicaID   `json:"replica"`
-	Prev      uint        `json:"prev"`
-	Next      uint        `json:"next"`
-	lock      *sync.Mutex `json:"-"`
-}
-
-func NewEvent(id uint, replica ReplicaID, t EventType, ts int64) *Event {
-	return &Event{
-		ID:        id,
-		Replica:   replica,
-		TypeS:     t.String(),
-		Type:      t,
-		Timestamp: ts,
-		Prev:      0,
-		Next:      0,
-		lock:      new(sync.Mutex),
-	}
-}
-
-func (e *Event) UpdatePrev(p *Event) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	e.Prev = p.ID
-}
-
-func (e *Event) UpdateNext(n *Event) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	e.Next = n.ID
-}
-
-func (e *Event) GetNext() uint {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	return e.Next
+	Replica   ReplicaID `json:"replica"`
+	Type      EventType `json:"-"`
+	TypeS     string    `json:"type"`
+	ID        uint64    `json:"id"`
+	Timestamp int64     `json:"timestamp"`
 }
 
 func (e *Event) Clone() Clonable {
-	e.lock.Lock()
-	defer e.lock.Unlock()
 	return &Event{
-		ID:        e.ID,
 		Replica:   e.Replica,
 		Type:      e.Type.Clone(),
+		TypeS:     e.TypeS,
+		ID:        e.ID,
 		Timestamp: e.Timestamp,
-		Prev:      e.Prev,
-		Next:      e.Next,
-		lock:      new(sync.Mutex),
 	}
 }
 
-func (e *Event) Eq(o *Event) bool {
-	return e.ID == o.ID
+type EventNodeSet struct {
+	nodes map[uint64]*EventNode
+	lock  *sync.Mutex
 }
 
-func (e *Event) MessageID() (string, bool) {
-	if e.Type.Type() != ReceiveMessageTypeS && e.Type.Type() != SendMessageTypeS {
-		return "", false
+func NewEventNodeSet() *EventNodeSet {
+	return &EventNodeSet{
+		nodes: make(map[uint64]*EventNode),
+		lock:  new(sync.Mutex),
 	}
-	var msg *Message
-	switch e.Type.Type() {
-	case ReceiveMessageTypeS:
-		eT := e.Type.(*ReceiveMessageEventType)
-		msg = eT.Message()
-	case SendMessageTypeS:
-		eT := e.Type.(*SendMessageEventType)
-		msg = eT.Message()
+}
+
+func (s *EventNodeSet) Add(n *EventNode) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.nodes[n.ID] = n
+}
+
+func (s *EventNodeSet) Get(id uint64) *EventNode {
+	s.lock.Lock()
+	n, ok := s.nodes[id]
+	s.lock.Unlock()
+	if !ok {
+		return nil
 	}
-	return msg.ID, true
+	return n
+}
+
+func (s *EventNodeSet) Iter() []*EventNode {
+	result := make([]*EventNode, len(s.nodes))
+	i := 0
+	s.lock.Lock()
+	for _, n := range s.nodes {
+		result[i] = n
+		i++
+	}
+	s.lock.Unlock()
+	return result
+}
+
+func (s *EventNodeSet) Union(n *EventNodeSet) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	for _, node := range n.Iter() {
+		s.nodes[node.ID] = node
+	}
+}
+
+func (s *EventNodeSet) Has(id uint64) bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	_, ok := s.nodes[id]
+	return ok
+}
+
+// EventQueue datastructure to store the messages in a FIFO queue
+type EventQueue struct {
+	events      []*Event
+	subscribers map[string]chan *Event
+	lock        *sync.Mutex
+	size        int
+	dispatchWG  *sync.WaitGroup
+	*BaseService
+}
+
+// NewEventQueue returens an emtpy EventQueue
+func NewEventQueue(logger *log.Logger) *EventQueue {
+	return &EventQueue{
+		events:      make([]*Event, 0),
+		size:        0,
+		subscribers: make(map[string]chan *Event),
+		lock:        new(sync.Mutex),
+		dispatchWG:  new(sync.WaitGroup),
+		BaseService: NewBaseService("EventQueue", logger),
+	}
+}
+
+// Start implements Service
+func (q *EventQueue) Start() error {
+	q.StartRunning()
+	go q.dispatchloop()
+	return nil
+}
+
+func (q *EventQueue) dispatchloop() {
+	for {
+		q.lock.Lock()
+		size := q.size
+		messages := q.events
+		q.lock.Unlock()
+
+		if size > 0 {
+			toAdd := messages[0]
+
+			for _, s := range q.subscribers {
+				q.dispatchWG.Add(1)
+				go func(subs chan *Event) {
+					select {
+					case subs <- toAdd.Clone().(*Event):
+					case <-q.QuitCh():
+					}
+					q.dispatchWG.Done()
+				}(s)
+			}
+
+			q.lock.Lock()
+			q.size = q.size - 1
+			q.events = q.events[1:]
+			q.lock.Unlock()
+		}
+	}
+}
+
+// Stop implements Service
+func (q *EventQueue) Stop() error {
+	q.StopRunning()
+	q.dispatchWG.Wait()
+	return nil
+}
+
+// Add adds a message to the queue
+func (q *EventQueue) Add(m *Event) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	q.events = append(q.events, m)
+	q.size = q.size + 1
+}
+
+// Flush clears the queue of all messages
+func (q *EventQueue) Flush() {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	q.events = make([]*Event, 0)
+	q.size = 0
+}
+
+// Restart implements Service
+func (q *EventQueue) Restart() error {
+	q.Flush()
+	return nil
+}
+
+func (q *EventQueue) Subscribe(label string) (chan *Event, error) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	_, ok := q.subscribers[label]
+	if ok {
+		return nil, ErrDuplicateSubs
+	}
+	newChan := make(chan *Event, 10)
+	q.subscribers[label] = newChan
+	return newChan, nil
 }

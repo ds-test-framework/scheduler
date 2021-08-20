@@ -16,9 +16,10 @@ import (
 const DefaultAddr = "0.0.0.0:7074"
 
 type APIServer struct {
-	router *gin.Engine
-	ctx    *context.RootContext
-	gen    *util.Counter
+	router    *gin.Engine
+	ctx       *context.RootContext
+	gen       *util.Counter
+	dashboard DashboardRouter
 
 	server *http.Server
 	addr   string
@@ -26,12 +27,13 @@ type APIServer struct {
 	*types.BaseService
 }
 
-func NewAPIServer(ctx *context.RootContext) *APIServer {
+func NewAPIServer(ctx *context.RootContext, dashboard DashboardRouter) *APIServer {
 
 	server := &APIServer{
 		gen:         ctx.Counter,
 		ctx:         ctx,
 		addr:        ctx.Config.APIServerAddr,
+		dashboard:   dashboard,
 		BaseService: types.NewBaseService("APIServer", ctx.Logger),
 	}
 	gin.SetMode(gin.ReleaseMode)
@@ -41,9 +43,13 @@ func NewAPIServer(ctx *context.RootContext) *APIServer {
 	router.POST("/message", server.HandleMessage)
 	router.POST("/event", server.HandleEvent)
 	router.POST("/replica", server.HandleReplicaPost)
+	router.POST("/log", server.HandleEvent)
 
 	router.GET("/replicas", server.handleReplicas)
 	router.GET("/replicas/:replica", server.handleReplicaGet)
+	router.GET("/dashboard/name", server.HandleDashboardName)
+
+	dashboard.SetupRouter(router)
 
 	server.router = router
 	server.server = &http.Server{

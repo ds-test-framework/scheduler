@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/ds-test-framework/scheduler/config"
 	"github.com/ds-test-framework/scheduler/log"
@@ -17,7 +18,7 @@ func TestTestingServer(t *testing.T) {
 
 	srv, err := NewTestingServer(&config.Config{
 		APIServerAddr: "192.168.0.2:7074",
-	}, []interface{}{})
+	}, []*TestCase{NewTestCase("dummy", 2*time.Second)})
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
@@ -28,5 +29,5 @@ func TestTestingServer(t *testing.T) {
 		log.Info(fmt.Sprintf("Received syscall: %s", oscall.String()))
 		srv.Stop()
 	}()
-	srv.Run()
+	srv.Start()
 }

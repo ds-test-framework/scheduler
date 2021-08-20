@@ -14,34 +14,41 @@ type TestingServer struct {
 	dispatcher *dispatcher.Dispatcher
 	ctx        *context.RootContext
 	messagesCh chan *types.Message
+	eventCh    chan *types.Event
+
+	testCases      []*TestCase
+	executionState *executionState
+	reportStore    *TestCaseReportStore
 	*types.BaseService
 }
 
-func NewTestingServer(config *config.Config, testcases []interface{}) (*TestingServer, error) {
+func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingServer, error) {
 	log.Init(config.LogConfig)
 	ctx := context.NewRootContext(config, log.DefaultLogger)
-	ch, err := ctx.MessageQueue.Subscribe("testingserver")
-	if err != nil {
-		return nil, err
+
+	server := &TestingServer{
+		apiserver:      nil,
+		dispatcher:     dispatcher.NewDispatcher(ctx),
+		ctx:            ctx,
+		messagesCh:     ctx.MessageQueue.Subscribe("testingServer"),
+		eventCh:        ctx.EventQueue.Subscribe("testingServer"),
+		testCases:      testcases,
+		executionState: newExecutionState(),
+		reportStore:    NewTestCaseReportStore(),
+		BaseService:    types.NewBaseService("TestingServer", log.DefaultLogger),
 	}
 
-	return &TestingServer{
-		apiserver:   apiserver.NewAPIServer(ctx),
-		dispatcher:  dispatcher.NewDispatcher(ctx),
-		ctx:         ctx,
-		messagesCh:  ch,
-		BaseService: types.NewBaseService("TestingServer", log.DefaultLogger),
-	}, nil
+	server.apiserver = apiserver.NewAPIServer(ctx, server)
+	return server, nil
 }
 
-func (srv *TestingServer) Run() {
+func (srv *TestingServer) Start() {
 	srv.StartRunning()
 	srv.apiserver.Start()
 	srv.ctx.Start()
-	srv.poll()
+	srv.execute()
 }
 
-// dummy, for now just dispatch the messages that come through
 func (srv *TestingServer) poll() {
 	for {
 		select {

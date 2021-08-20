@@ -6,18 +6,18 @@ import (
 )
 
 type MessageSendEventType struct {
-	Message *Message
+	MessageID string
 }
 
-func NewMessageSendEventType(message *Message) *MessageSendEventType {
+func NewMessageSendEventType(messageID string) *MessageSendEventType {
 	return &MessageSendEventType{
-		Message: message,
+		MessageID: messageID,
 	}
 }
 
 func (s *MessageSendEventType) Clone() EventType {
 	return &MessageSendEventType{
-		Message: s.Message,
+		MessageID: s.MessageID,
 	}
 }
 
@@ -26,22 +26,22 @@ func (s *MessageSendEventType) Type() string {
 }
 
 func (s *MessageSendEventType) String() string {
-	return fmt.Sprintf("MessageSend { %s }", s.Message.ID)
+	return fmt.Sprintf("MessageSend { %s }", s.MessageID)
 }
 
 type MessageReceiveEventType struct {
-	Message *Message
+	MessageID string
 }
 
-func NewMessageReceiveEventType(message *Message) *MessageReceiveEventType {
+func NewMessageReceiveEventType(messageID string) *MessageReceiveEventType {
 	return &MessageReceiveEventType{
-		Message: message,
+		MessageID: messageID,
 	}
 }
 
 func (r *MessageReceiveEventType) Clone() EventType {
 	return &MessageReceiveEventType{
-		Message: r.Message,
+		MessageID: r.MessageID,
 	}
 }
 
@@ -50,7 +50,7 @@ func (r *MessageReceiveEventType) Type() string {
 }
 
 func (r *MessageReceiveEventType) String() string {
-	return fmt.Sprintf("MessageReceive { %s }", r.Message.ID)
+	return fmt.Sprintf("MessageReceive { %s }", r.MessageID)
 }
 
 type TimeoutStartEventType struct {

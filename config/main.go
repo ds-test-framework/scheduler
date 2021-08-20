@@ -6,6 +6,10 @@ import (
 	"io/ioutil"
 )
 
+var (
+	ConfigPath string
+)
+
 type Config struct {
 	NumReplicas   int       `json:"num_replicas"`
 	Byzantine     bool      `json:"byzantine"`

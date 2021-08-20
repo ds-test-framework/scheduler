@@ -119,12 +119,13 @@ func (q *EventQueue) dispatchloop() {
 		q.lock.Lock()
 		size := q.size
 		messages := q.events
+		subcribers := q.subscribers
 		q.lock.Unlock()
 
 		if size > 0 {
 			toAdd := messages[0]
 
-			for _, s := range q.subscribers {
+			for _, s := range subcribers {
 				q.dispatchWG.Add(1)
 				go func(subs chan *Event) {
 					select {
@@ -174,14 +175,14 @@ func (q *EventQueue) Restart() error {
 	return nil
 }
 
-func (q *EventQueue) Subscribe(label string) (chan *Event, error) {
+func (q *EventQueue) Subscribe(label string) chan *Event {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	_, ok := q.subscribers[label]
+	ch, ok := q.subscribers[label]
 	if ok {
-		return nil, ErrDuplicateSubs
+		return ch
 	}
 	newChan := make(chan *Event, 10)
 	q.subscribers[label] = newChan
-	return newChan, nil
+	return newChan
 }

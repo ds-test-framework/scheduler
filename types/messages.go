@@ -89,6 +89,7 @@ type MessageQueue struct {
 	lock        *sync.Mutex
 	size        int
 	dispatchWG  *sync.WaitGroup
+	enabled     bool
 	*BaseService
 }
 
@@ -100,6 +101,7 @@ func NewMessageQueue(logger *log.Logger) *MessageQueue {
 		subscribers: make(map[string]chan *Message),
 		lock:        new(sync.Mutex),
 		dispatchWG:  new(sync.WaitGroup),
+		enabled:     true,
 		BaseService: NewBaseService("MessageQueue", logger),
 	}
 }
@@ -116,12 +118,14 @@ func (q *MessageQueue) dispatchloop() {
 		q.lock.Lock()
 		size := q.size
 		messages := q.messages
+
+		subscribers := q.subscribers
 		q.lock.Unlock()
 
 		if size > 0 {
 			toAdd := messages[0]
 
-			for _, s := range q.subscribers {
+			for _, s := range subscribers {
 				q.dispatchWG.Add(1)
 				go func(subs chan *Message) {
 					select {
@@ -152,6 +156,10 @@ func (q *MessageQueue) Add(m *Message) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
+	if !q.enabled {
+		return
+	}
+
 	q.messages = append(q.messages, m)
 	q.size = q.size + 1
 }
@@ -171,14 +179,29 @@ func (q *MessageQueue) Restart() error {
 	return nil
 }
 
-func (q *MessageQueue) Subscribe(label string) (chan *Message, error) {
+// Disable closes the queue and drops all incoming messages
+// Use with caution
+func (q *MessageQueue) Disable() {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	_, ok := q.subscribers[label]
+	q.enabled = false
+}
+
+// Enable enqueues the messages and feeds it to the subscribers if any
+func (q *MessageQueue) Enable() {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	q.enabled = true
+}
+
+func (q *MessageQueue) Subscribe(label string) chan *Message {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	ch, ok := q.subscribers[label]
 	if ok {
-		return nil, ErrDuplicateSubs
+		return ch
 	}
 	newChan := make(chan *Message, DefaultSubsChSize)
 	q.subscribers[label] = newChan
-	return newChan, nil
+	return newChan
 }

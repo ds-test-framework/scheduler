@@ -34,11 +34,15 @@ func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingSer
 		eventCh:        ctx.EventQueue.Subscribe("testingServer"),
 		testCases:      testcases,
 		executionState: newExecutionState(),
-		reportStore:    NewTestCaseReportStore(),
+		reportStore:    NewTestCaseReportStore(config.ReportStoreConfig),
 		BaseService:    types.NewBaseService("TestingServer", log.DefaultLogger),
 	}
 
 	server.apiserver = apiserver.NewAPIServer(ctx, server)
+
+	for _, t := range testcases {
+		t.Logger = server.Logger.With(log.LogParams{"testcase": t.Name})
+	}
 	return server, nil
 }
 

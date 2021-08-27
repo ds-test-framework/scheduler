@@ -14,7 +14,7 @@ var (
 )
 
 func (srv *APIServer) HandleMessage(c *gin.Context) {
-	srv.Logger.Info("Handling message")
+	srv.Logger.Debug("Handling message")
 	var msg types.Message
 	if err := c.ShouldBindJSON(&msg); err != nil {
 		srv.Logger.With(log.LogParams{"error": err}).Info("Bad message")
@@ -67,7 +67,7 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 	switch e.TypeS {
 	case messageSendEventType:
 		messageID := e.Params["message_id"]
-		eventType = types.NewMessageReceiveEventType(messageID)
+		eventType = types.NewMessageSendEventType(messageID)
 	case messageReceiveEventType:
 		messageID := e.Params["message_id"]
 		eventType = types.NewMessageReceiveEventType(messageID)

@@ -24,6 +24,7 @@ type Replica struct {
 type ReplicaStore struct {
 	replicas map[ReplicaID]*Replica
 	lock     *sync.Mutex
+	cap      int
 }
 
 // NewReplicaStore creates an empty ReplicaStore
@@ -31,6 +32,7 @@ func NewReplicaStore(size int) *ReplicaStore {
 	return &ReplicaStore{
 		replicas: make(map[ReplicaID]*Replica),
 		lock:     new(sync.Mutex),
+		cap:      size,
 	}
 }
 
@@ -90,4 +92,8 @@ func (s *ReplicaStore) ResetReady() {
 	for _, p := range s.replicas {
 		p.Ready = false
 	}
+}
+
+func (s *ReplicaStore) Cap() int {
+	return s.cap
 }

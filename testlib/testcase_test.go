@@ -19,8 +19,9 @@ func TestBuilderPatter(t *testing.T) {
 		return []*types.Message{}
 	}
 
-	builder.
-		On(dummyCond, "new").Do(dummyAction).
+	new := builder.
+		On(dummyCond, "new").Do(dummyAction)
+	new.
 		On(dummyCond, "new1").Do(dummyAction).
 		On(dummyCond, testcase.Fail().Label)
 }

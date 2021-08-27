@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (v *Visualizer) SetupRouter(r *gin.Engine) {
+func (v *Visualizer) SetupRouter(r *gin.RouterGroup) {
 	group := r.Group("/visualize")
 	group.GET("/messages", v.HandleMessagesGET)
 	group.POST("/message/:id", v.HandleMessagesPOST)

@@ -40,16 +40,20 @@ func NewAPIServer(ctx *context.RootContext, dashboard DashboardRouter) *APIServe
 	router := gin.New()
 	router.Use(server.logMiddleware)
 
+	router.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/dashboard")
+	})
 	router.POST("/message", server.HandleMessage)
 	router.POST("/event", server.HandleEvent)
 	router.POST("/replica", server.HandleReplicaPost)
-	router.POST("/log", server.HandleEvent)
+	router.POST("/log", server.HandleLog)
 
 	router.GET("/replicas", server.handleReplicas)
 	router.GET("/replicas/:replica", server.handleReplicaGet)
 	router.GET("/dashboard/name", server.HandleDashboardName)
+	router.GET("/dashboard", server.HandleDashboard)
 
-	dashboard.SetupRouter(router)
+	dashboard.SetupRouter(router.Group("/dashboard/api"))
 
 	server.router = router
 	server.server = &http.Server{
@@ -81,7 +85,7 @@ func (a *APIServer) logMiddleware(c *gin.Context) {
 		"error":       c.Errors.ByType(gin.ErrorTypePrivate).String(),
 		"body_size":   c.Writer.Size(),
 		"path":        path,
-	}).Info("Handled request")
+	}).Debug("Handled request")
 }
 
 func (a *APIServer) Start() {

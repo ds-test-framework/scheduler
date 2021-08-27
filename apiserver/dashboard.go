@@ -8,7 +8,7 @@ import (
 
 type DashboardRouter interface {
 	Name() string
-	SetupRouter(*gin.Engine)
+	SetupRouter(*gin.RouterGroup)
 }
 
 func (srv *APIServer) HandleDashboardName(c *gin.Context) {
@@ -21,4 +21,8 @@ func (srv *APIServer) HandleDashboardName(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"name": srv.dashboard.Name(),
 	})
+}
+
+func (srv *APIServer) HandleDashboard(c *gin.Context) {
+
 }

@@ -40,16 +40,19 @@ func NewBaseService(name string, parentLogger *log.Logger) *BaseService {
 }
 
 func (b *BaseService) StartRunning() {
+	b.Logger.Debug("Starting service")
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	b.running = true
 }
 
 func (b *BaseService) StopRunning() {
+	b.Logger.Debug("Stopping service")
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	b.running = false
 	b.o.Do(func() {
+		b.Logger.Debug("Closing quit channel")
 		close(b.quit)
 	})
 }

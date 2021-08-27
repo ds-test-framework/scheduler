@@ -68,6 +68,23 @@ func (c *Context) setEvent(e *types.Event) {
 	c.CurEvent = e
 }
 
+type runState struct {
+	curState *State
+	lock     *sync.Mutex
+}
+
+func (r *runState) CurState() *State {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	return r.curState
+}
+
+func (r *runState) Transition(s *State) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.curState = s
+}
+
 type TestCase struct {
 	Name    string
 	Timeout time.Duration
@@ -75,9 +92,13 @@ type TestCase struct {
 	states  map[string]*State
 	Logger  *log.Logger
 
-	curState *State
-	doneCh   chan string
-	once     *sync.Once
+	run    *runState
+	doneCh chan string
+	once   *sync.Once
+}
+
+func defaultSetupFunc(c *Context) error {
+	return nil
 }
 
 func AllowAllAction(c *Context) []*types.Message {
@@ -98,13 +119,19 @@ func NewTestCase(name string, timeout time.Duration) *TestCase {
 		Name:    name,
 		Timeout: timeout,
 		states:  make(map[string]*State),
+		Setup:   defaultSetupFunc,
 		doneCh:  make(chan string, 1),
 		once:    new(sync.Once),
 	}
-	t.states[startStateLabel] = &State{
+	startState := &State{
 		Label:       startStateLabel,
 		Action:      AllowAllAction,
 		Transitions: make(map[string]Condition),
+	}
+	t.states[startStateLabel] = startState
+	t.run = &runState{
+		curState: startState,
+		lock:     new(sync.Mutex),
 	}
 	t.states[successStateLabel] = &State{
 		Label:       successStateLabel,
@@ -139,26 +166,27 @@ func (t *TestCase) Fail() *State {
 }
 
 func (t *TestCase) Step(c *Context) []*types.Message {
-	c.CurState = t.curState
-	result := t.curState.Action(c)
-	for label, cond := range t.curState.Transitions {
+	c.CurState = t.run.CurState()
+	result := t.run.CurState().Action(c)
+	for label, cond := range t.run.CurState().Transitions {
 		if cond(c) {
 			nextState, ok := t.states[label]
 			if ok {
-				t.curState = nextState
+				t.run.Transition(nextState)
 			}
 		}
 	}
-	if t.curState.Label == successStateLabel || t.curState.Label == failureStateLabel {
+	curState := t.run.CurState()
+	if curState.Label == successStateLabel || curState.Label == failureStateLabel {
 		t.once.Do(func() {
-			t.doneCh <- t.curState.Label
+			t.doneCh <- curState.Label
 		})
 	}
 	return result
 }
 
 func (t *TestCase) Assert() bool {
-	return t.curState.Label == successStateLabel
+	return t.run.CurState().Label == successStateLabel
 }
 
 func (t *TestCase) SetupFunc(setupFunc func(*Context) error) {

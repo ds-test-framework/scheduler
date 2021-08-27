@@ -16,6 +16,10 @@ type State struct {
 	Transitions map[string]Condition
 }
 
+func (s *State) Eq(other *State) bool {
+	return s.Label == other.Label
+}
+
 type Vars struct {
 	vars map[string]interface{}
 	lock *sync.Mutex

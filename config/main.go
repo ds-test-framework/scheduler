@@ -11,10 +11,11 @@ var (
 )
 
 type Config struct {
-	NumReplicas   int       `json:"num_replicas"`
-	Byzantine     bool      `json:"byzantine"`
-	APIServerAddr string    `json:"server_addr"`
-	LogConfig     LogConfig `json:"log"`
+	NumReplicas       int               `json:"num_replicas"`
+	Byzantine         bool              `json:"byzantine"`
+	APIServerAddr     string            `json:"server_addr"`
+	LogConfig         LogConfig         `json:"log"`
+	ReportStoreConfig ReportStoreConfig `json:"report_store"`
 }
 
 type LogConfig struct {
@@ -22,6 +23,10 @@ type LogConfig struct {
 	Format string `json:"format"`
 	// one of panic|fatal|error|warn|warning|info|debug|trace
 	Level string `json:"level"`
+}
+
+type ReportStoreConfig struct {
+	Path string `json:"path"`
 }
 
 func ParseConfig(path string) (*Config, error) {
@@ -37,6 +42,9 @@ func ParseConfig(path string) (*Config, error) {
 			Path:   "",
 			Format: "json",
 			Level:  "info",
+		},
+		ReportStoreConfig: ReportStoreConfig{
+			Path: "test_reports",
 		},
 	}
 	err = json.Unmarshal(bytes, &defaultConfig)

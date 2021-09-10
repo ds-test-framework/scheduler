@@ -7,28 +7,41 @@ import (
 )
 
 var (
+	// ConfigPath is the variable which stores the config path command line parameter
 	ConfigPath string
 )
 
+// Config stores the config for the tool
 type Config struct {
-	NumReplicas       int               `json:"num_replicas"`
-	Byzantine         bool              `json:"byzantine"`
-	APIServerAddr     string            `json:"server_addr"`
-	LogConfig         LogConfig         `json:"log"`
+	// NumReplicas number of replicas that are in the distributed system
+	NumReplicas int `json:"num_replicas"`
+	// Byzantine indicating if the algorithm being tested is byzantine fault tolerant
+	Byzantine bool `json:"byzantine"`
+	// APIServerAddr address of the APIServer
+	APIServerAddr string `json:"server_addr"`
+	// LogConfig configuration for logging
+	LogConfig LogConfig `json:"log"`
+	// ReportStoreConfig config for recording unit test reports
 	ReportStoreConfig ReportStoreConfig `json:"report_store"`
 }
 
+// LogConfig stores the config for logging purpose
 type LogConfig struct {
-	Path   string `json:"path"`
+	// Path of the log file
+	Path string `json:"path"`
+	// Format to log. Only `json` is currently supported
 	Format string `json:"format"`
-	// one of panic|fatal|error|warn|warning|info|debug|trace
+	// Level log level, one of panic|fatal|error|warn|warning|info|debug|trace
 	Level string `json:"level"`
 }
 
+// ReportStoreConfig configuration of the unit test reports
 type ReportStoreConfig struct {
-	Path string `json:"path"`
+	Path    string `json:"path"`
+	OldPath string `json:"old_path"`
 }
 
+// PatseConfig parses config from the specificied file
 func ParseConfig(path string) (*Config, error) {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {

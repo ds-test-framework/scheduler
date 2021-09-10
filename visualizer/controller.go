@@ -10,6 +10,9 @@ import (
 	"github.com/ds-test-framework/scheduler/types"
 )
 
+// Visualizer is one of the modes of executing the tool
+// where the user can control the messages delivery order
+// through an interactive dashboard
 type Visualizer struct {
 	apiserver   *apiserver.APIServer
 	dispatcher  *dispatcher.Dispatcher
@@ -27,6 +30,7 @@ type Visualizer struct {
 	*types.BaseService
 }
 
+// NewVisualizer instantiates a Visualizer
 func NewVisualizer(ctx *context.RootContext) *Visualizer {
 	v := &Visualizer{
 		dispatcher:  dispatcher.NewDispatcher(ctx),
@@ -46,12 +50,14 @@ func NewVisualizer(ctx *context.RootContext) *Visualizer {
 	return v
 }
 
+// Start implements Service
 func (v *Visualizer) Start() {
 	v.StartRunning()
 	go v.eventloop()
 	go v.messageloop()
 }
 
+// Stop implements Service
 func (v *Visualizer) Stop() {
 	v.StopRunning()
 }

@@ -4,6 +4,8 @@ import (
 	goctx "context"
 	"errors"
 	"net/http"
+	"path"
+	"runtime"
 	"time"
 
 	"github.com/ds-test-framework/scheduler/context"
@@ -13,8 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// DefaultAddr is the default address of the APIServer
 const DefaultAddr = "0.0.0.0:7074"
 
+// APIServer runs a HTTP server to receive messages from
+// the replicas and provide an interactive dashboard
 type APIServer struct {
 	router    *gin.Engine
 	ctx       *context.RootContext
@@ -27,6 +32,7 @@ type APIServer struct {
 	*types.BaseService
 }
 
+// NewAPIServer instantiates APIServer
 func NewAPIServer(ctx *context.RootContext, dashboard DashboardRouter) *APIServer {
 
 	server := &APIServer{
@@ -41,7 +47,7 @@ func NewAPIServer(ctx *context.RootContext, dashboard DashboardRouter) *APIServe
 	router.Use(server.logMiddleware)
 
 	router.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/dashboard")
+		c.Redirect(http.StatusMovedPermanently, "/dashboard/app")
 	})
 	router.POST("/message", server.HandleMessage)
 	router.POST("/event", server.HandleEvent)
@@ -51,7 +57,9 @@ func NewAPIServer(ctx *context.RootContext, dashboard DashboardRouter) *APIServe
 	router.GET("/replicas", server.handleReplicas)
 	router.GET("/replicas/:replica", server.handleReplicaGet)
 	router.GET("/dashboard/name", server.HandleDashboardName)
-	router.GET("/dashboard", server.HandleDashboard)
+
+	_, file, _, _ := runtime.Caller(0)
+	router.StaticFS("/dashboard/app", gin.Dir(path.Join(path.Dir(file), "dist"), false))
 
 	dashboard.SetupRouter(router.Group("/dashboard/api"))
 
@@ -88,6 +96,7 @@ func (a *APIServer) logMiddleware(c *gin.Context) {
 	}).Debug("Handled request")
 }
 
+// Start starts the APIServer and implements Service
 func (a *APIServer) Start() {
 	a.StartRunning()
 	go func() {
@@ -103,6 +112,7 @@ func (a *APIServer) Start() {
 	}()
 }
 
+// Stop stops the APIServer and implements Service
 func (a *APIServer) Stop() {
 	a.StopRunning()
 	ctx, cancel := goctx.WithTimeout(goctx.Background(), 5*time.Second)

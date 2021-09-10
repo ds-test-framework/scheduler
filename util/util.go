@@ -9,11 +9,13 @@ import (
 	"sync"
 )
 
+// Counter is a thread safe monotonic natural number counter
 type Counter struct {
 	counter int
 	mtx     *sync.Mutex
 }
 
+// NewCounter instantiates Counter
 func NewCounter() *Counter {
 	return &Counter{
 		counter: 0,
@@ -21,6 +23,7 @@ func NewCounter() *Counter {
 	}
 }
 
+// Next returns the next value
 func (id *Counter) Next() int {
 	id.mtx.Lock()
 	defer id.mtx.Unlock()
@@ -31,6 +34,7 @@ func (id *Counter) Next() int {
 	return cur
 }
 
+// Reset resets the counter to 0
 func (id *Counter) Reset() {
 	id.mtx.Lock()
 	defer id.mtx.Unlock()

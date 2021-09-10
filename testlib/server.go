@@ -9,6 +9,7 @@ import (
 	"github.com/ds-test-framework/scheduler/types"
 )
 
+// TestingServer is used to run the scheduler tool for unit testing
 type TestingServer struct {
 	apiserver  *apiserver.APIServer
 	dispatcher *dispatcher.Dispatcher
@@ -16,12 +17,14 @@ type TestingServer struct {
 	messagesCh chan *types.Message
 	eventCh    chan *types.Event
 
-	testCases      []*TestCase
+	testCases      map[string]*TestCase
 	executionState *executionState
 	reportStore    *TestCaseReportStore
 	*types.BaseService
 }
 
+// NewTestingServer instantiates TestingServer
+// testcases are passed as arguments
 func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingServer, error) {
 	log.Init(config.LogConfig)
 	ctx := context.NewRootContext(config, log.DefaultLogger)
@@ -32,10 +35,13 @@ func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingSer
 		ctx:            ctx,
 		messagesCh:     ctx.MessageQueue.Subscribe("testingServer"),
 		eventCh:        ctx.EventQueue.Subscribe("testingServer"),
-		testCases:      testcases,
+		testCases:      make(map[string]*TestCase),
 		executionState: newExecutionState(),
 		reportStore:    NewTestCaseReportStore(config.ReportStoreConfig),
 		BaseService:    types.NewBaseService("TestingServer", log.DefaultLogger),
+	}
+	for _, t := range testcases {
+		server.testCases[t.Name] = t
 	}
 
 	server.apiserver = apiserver.NewAPIServer(ctx, server)
@@ -46,11 +52,16 @@ func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingSer
 	return server, nil
 }
 
+// Start starts the TestingServer and implements Service
 func (srv *TestingServer) Start() {
 	srv.StartRunning()
 	srv.apiserver.Start()
 	srv.ctx.Start()
 	srv.execute()
+
+	// Just keep running until asked to stop
+	// For dashboard purposes
+	<-srv.QuitCh()
 }
 
 func (srv *TestingServer) poll() {
@@ -70,6 +81,7 @@ func (srv *TestingServer) poll() {
 	}
 }
 
+// Stop stops the TestingServer and implements Service
 func (srv *TestingServer) Stop() {
 	srv.StopRunning()
 	srv.apiserver.Stop()

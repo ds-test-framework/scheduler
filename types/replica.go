@@ -6,6 +6,7 @@ import (
 )
 
 var (
+	// ErrReplicaStoreFull is returned when more than the intended number of replicas register with the scheduler tool
 	ErrReplicaStoreFull = errors.New("replica store is full")
 )
 

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// VisualizerCmd returns the command for running a visualizer
 func VisualizerCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "viz",

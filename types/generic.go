@@ -1,5 +1,6 @@
 package types
 
+// Clonable is any type which returns a copy of itself on Clone()
 type Clonable interface {
 	Clone() Clonable
 }

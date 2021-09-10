@@ -82,6 +82,37 @@ func (s *MessageStore) Add(m *Message) *Message {
 	return nil
 }
 
+// Iter returns a list of all the messages in the store
+func (s *MessageStore) Iter() []*Message {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	result := make([]*Message, len(s.messages))
+	i := 0
+	for _, m := range s.messages {
+		result[i] = m
+		i++
+	}
+	return result
+}
+
+// Remove returns and deleted the message from the store if it exists. Returns nil otherwise
+func (s *MessageStore) Remove(id string) *Message {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	m, ok := s.messages[id]
+	if ok {
+		delete(s.messages, id)
+		return m
+	}
+	return nil
+}
+
+func (s *MessageStore) Size() int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return len(s.messages)
+}
+
 // MessageQueue datastructure to store the messages in a FIFO queue
 type MessageQueue struct {
 	messages    []*Message
@@ -194,6 +225,7 @@ func (q *MessageQueue) Enable() {
 	q.enabled = true
 }
 
+// Subscribe create and returns a channel for the subscriber with the specified label
 func (q *MessageQueue) Subscribe(label string) chan *Message {
 	q.lock.Lock()
 	defer q.lock.Unlock()

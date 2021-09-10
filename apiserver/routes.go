@@ -13,6 +13,8 @@ var (
 	messageReceiveEventType = "MessageReceive"
 )
 
+// HandleMessage is the handler for the route `/message`
+// which is used by replicas to send messages
 func (srv *APIServer) HandleMessage(c *gin.Context) {
 	srv.Logger.Debug("Handling message")
 	var msg types.Message
@@ -27,6 +29,8 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// HandleReplicaPost is the handler for the route `/replica` for a POST request.
+// The route is used by replicas to register and start communicating with the scheduler
 func (srv *APIServer) HandleReplicaPost(c *gin.Context) {
 	var replica types.Replica
 	if err := c.ShouldBindJSON(&replica); err != nil {
@@ -50,6 +54,8 @@ type eventS struct {
 	Params      map[string]string `json:"params"`
 }
 
+// HandleEvent is the handler for the router `/event` .
+// The route is used by replicas to send events to the scheduler
 func (srv *APIServer) HandleEvent(c *gin.Context) {
 	var e eventS
 	if err := c.ShouldBindJSON(&e); err != nil {
@@ -105,6 +111,8 @@ func (srv *APIServer) handleReplicaGet(c *gin.Context) {
 	c.JSON(http.StatusOK, replica)
 }
 
+// HandleLog is the handler for the route `/log`
+// The route is used by replicas to send log messages
 func (srv *APIServer) HandleLog(c *gin.Context) {
 	var l types.ReplicaLog
 	if err := c.ShouldBindJSON(&l); err != nil {

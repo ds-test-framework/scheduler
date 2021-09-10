@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// RootCmd returs the root cobra command of the scheduler tool
 func RootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",

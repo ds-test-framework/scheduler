@@ -8,9 +8,12 @@ import (
 )
 
 var (
-	ErrSendFailed       = errors.New("sending failed")
+	// ErrSendFaied is returned when the request could not be created
+	ErrSendFailed = errors.New("sending failed")
+	// ErrResponseReadFail is returned when the response to the request could not be read
 	ErrResponseReadFail = errors.New("failed to read response")
-	ErrBadResponse      = errors.New("bad response")
+	// ErrBadResponse is returned when the request did not receive a 2** response
+	ErrBadResponse = errors.New("bad response")
 )
 
 // RequestOption can be used to modify the request that is to be sent
@@ -23,6 +26,7 @@ func JsonRequest() RequestOption {
 	}
 }
 
+// SendMessage creates and send a HTTP Request to the specified addresss
 func SendMsg(method, toAddr, msg string, options ...RequestOption) (string, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest(method, "http://"+toAddr, bytes.NewBuffer([]byte(msg)))

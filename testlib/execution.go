@@ -42,9 +42,10 @@ func (e *executionState) Unblock() {
 func (e *executionState) NewTestCase(ctx *context.RootContext, testcase *TestCase) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.curCtx = NewContext(ctx)
+	e.curCtx = NewContext(ctx, testcase)
 	e.testcase = testcase
 	e.report = NewTestCaseReport(testcase.Name)
+	e.report.AddStateTransition(testcase.run.CurState())
 }
 
 func (e *executionState) CurCtx() *Context {
@@ -137,7 +138,9 @@ MainLoop:
 		// Reset the servers and flush the queues after waiting for some time
 		//
 	}
-	srv.reportStore.Save()
+	if err := srv.reportStore.Save(); err != nil {
+		srv.Logger.With(log.LogParams{"error": err}).Error("Error saving report")
+	}
 }
 
 func (srv *TestingServer) pollEvents() {
@@ -154,7 +157,7 @@ func (srv *TestingServer) pollEvents() {
 			report := srv.executionState.CurReport()
 			testcaseLogger := srv.Logger.With(log.LogParams{"testcase": testcase.Name})
 
-			testcaseLogger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Info("Stepping")
+			testcaseLogger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Debug("Stepping")
 			// 1. Add event to context and feed context to testcase
 			ctx.setEvent(e)
 			messages := testcase.Step(ctx)

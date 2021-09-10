@@ -6,19 +6,28 @@ import (
 	"github.com/ds-test-framework/scheduler/log"
 )
 
+// Service is any entity which runs on a separate thread
 type Service interface {
+	// Name of the service
 	Name() string
+	// Start to start the service
 	Start() error
+	// Running to indicate if the service is running
 	Running() bool
+	// Stop to stop the service
 	Stop() error
+	// Quit returns a channel which will be closed once the service stops running
 	Quit() <-chan struct{}
 }
 
+// RestartableService is a service which can be restarted
 type RestartableService interface {
 	Service
+	// Restart restarts the service
 	Restart() error
 }
 
+// BaseService provides the basic nuts an bolts needed to implement a service
 type BaseService struct {
 	running bool
 	o       *sync.Once
@@ -28,6 +37,7 @@ type BaseService struct {
 	Logger  *log.Logger
 }
 
+// NewBaseService instantiates BaseService
 func NewBaseService(name string, parentLogger *log.Logger) *BaseService {
 	return &BaseService{
 		running: false,
@@ -39,6 +49,7 @@ func NewBaseService(name string, parentLogger *log.Logger) *BaseService {
 	}
 }
 
+// StartRunning is called to set the running flag
 func (b *BaseService) StartRunning() {
 	b.Logger.Debug("Starting service")
 	b.lock.Lock()
@@ -46,6 +57,7 @@ func (b *BaseService) StartRunning() {
 	b.running = true
 }
 
+// StopRunning is called to unset the running flag
 func (b *BaseService) StopRunning() {
 	b.Logger.Debug("Stopping service")
 	b.lock.Lock()
@@ -57,16 +69,19 @@ func (b *BaseService) StopRunning() {
 	})
 }
 
+// Name returns the name of the service
 func (b *BaseService) Name() string {
 	return b.name
 }
 
+// Running returns the flag
 func (b *BaseService) Running() bool {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	return b.running
 }
 
+// QuitCh returns the quit channel which will be closed when the service stops running
 func (b *BaseService) QuitCh() <-chan struct{} {
 	return b.quit
 }

@@ -6,13 +6,19 @@ import (
 	"github.com/ds-test-framework/scheduler/log"
 )
 
+// ReplicaLog encapsulates a log message with the necessary attributes
 type ReplicaLog struct {
-	Params    map[string]string `json:"params"`
-	Message   string            `json:"message"`
-	Timestamp int64             `json:"timestamp"`
-	Replica   ReplicaID         `json:"replica"`
+	// Params is a marhsalled params of the log message
+	Params map[string]string `json:"params"`
+	// Message is the message that was logged
+	Message string `json:"message"`
+	// Timestamp of the log
+	Timestamp int64 `json:"timestamp"`
+	// Replica which posted the log
+	Replica ReplicaID `json:"replica"`
 }
 
+// Clone implements Clonable
 func (l *ReplicaLog) Clone() Clonable {
 	return &ReplicaLog{
 		Params:    l.Params,
@@ -22,11 +28,13 @@ func (l *ReplicaLog) Clone() Clonable {
 	}
 }
 
+// ReplicaLogStore stores the logs as a map indexed by the replica ID
 type ReplicaLogStore struct {
 	logs map[ReplicaID][]*ReplicaLog
 	lock *sync.Mutex
 }
 
+// NewReplicaLogStore instantiates a ReplicaLogStore
 func NewReplicaLogStore() *ReplicaLogStore {
 	return &ReplicaLogStore{
 		logs: make(map[ReplicaID][]*ReplicaLog),
@@ -34,6 +42,7 @@ func NewReplicaLogStore() *ReplicaLogStore {
 	}
 }
 
+// Add adds to the log store
 func (store *ReplicaLogStore) Add(log *ReplicaLog) {
 	store.lock.Lock()
 	defer store.lock.Unlock()
@@ -60,6 +69,7 @@ func (store *ReplicaLogStore) Add(log *ReplicaLog) {
 	store.logs[log.Replica][pos+1] = log
 }
 
+// GetLogs returns the list of logs for a replica where from <=index<to
 func (store *ReplicaLogStore) GetLogs(replica ReplicaID, from, to int) ([]*ReplicaLog, int) {
 	store.lock.Lock()
 	defer store.lock.Unlock()
@@ -70,6 +80,7 @@ func (store *ReplicaLogStore) GetLogs(replica ReplicaID, from, to int) ([]*Repli
 	return logs[from:to], len(logs)
 }
 
+// ReplicaLogQueue is the queue of log messages
 type ReplicaLogQueue struct {
 	logs        []*ReplicaLog
 	subscribers map[string]chan *ReplicaLog
@@ -79,6 +90,7 @@ type ReplicaLogQueue struct {
 	*BaseService
 }
 
+// NewReplicaLogQueue instantiates ReplicaLogQueue
 func NewReplicaLogQueue(logger *log.Logger) *ReplicaLogQueue {
 	return &ReplicaLogQueue{
 		logs:        make([]*ReplicaLog, 0),
@@ -90,11 +102,13 @@ func NewReplicaLogQueue(logger *log.Logger) *ReplicaLogQueue {
 	}
 }
 
+// Start implements Service
 func (q *ReplicaLogQueue) Start() {
 	q.StartRunning()
 	go q.dispatchloop()
 }
 
+// Stop implements Service
 func (q *ReplicaLogQueue) Stop() {
 	q.StopRunning()
 	q.dispatchWG.Wait()
@@ -129,6 +143,7 @@ func (q *ReplicaLogQueue) dispatchloop() {
 	}
 }
 
+// Subscribe creates and returns a channel for the subscriber
 func (q *ReplicaLogQueue) Subscribe(label string) chan *ReplicaLog {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -141,6 +156,7 @@ func (q *ReplicaLogQueue) Subscribe(label string) chan *ReplicaLog {
 	return ch
 }
 
+// Add adds to the queue
 func (q *ReplicaLogQueue) Add(log *ReplicaLog) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -149,6 +165,7 @@ func (q *ReplicaLogQueue) Add(log *ReplicaLog) {
 	q.size = q.size + 1
 }
 
+// Flush erases the contents of the queue
 func (q *ReplicaLogQueue) Flush() {
 	q.lock.Lock()
 	defer q.lock.Unlock()

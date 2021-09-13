@@ -167,15 +167,18 @@ func (srv *TestingServer) pollEvents() {
 				report.AddStateTransition(testcase.run.CurState())
 			}
 			// 3. Dispatch the messages
-			go srv.dispatchMessages(messages)
+			go srv.dispatchMessages(ctx, messages)
 		case <-srv.QuitCh():
 			return
 		}
 	}
 }
 
-func (srv *TestingServer) dispatchMessages(messages []*types.Message) {
+func (srv *TestingServer) dispatchMessages(ctx *Context, messages []*types.Message) {
 	for _, m := range messages {
+		if !ctx.MessagePool.Exists(m.ID) {
+			ctx.MessagePool.Add(m)
+		}
 		srv.dispatcher.DispatchMessage(m)
 	}
 }

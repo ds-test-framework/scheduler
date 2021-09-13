@@ -72,6 +72,14 @@ func (v *Vars) Set(label string, value interface{}) {
 	v.vars[label] = value
 }
 
+// Exists returns true if there is a variable of the specified key
+func (v *Vars) Exists(label string) bool {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	_, ok := v.vars[label]
+	return ok
+}
+
 // StateMachineBuilder implements a builder pattern for creating the testcase state machine
 type StateMachineBuilder struct {
 	testCase *TestCase
@@ -103,7 +111,7 @@ type StateBuilder struct {
 }
 
 // Do should be called to initialize the action of the current state
-func (s StateBuilder) Do(action StateAction) StateMachineBuilder {
+func (s StateBuilder) Action(action StateAction) StateMachineBuilder {
 	s.state.Action = action
 	return StateMachineBuilder{
 		testCase: s.testCase,

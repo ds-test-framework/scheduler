@@ -52,6 +52,7 @@ func NewVisualizer(ctx *context.RootContext) *Visualizer {
 
 // Start implements Service
 func (v *Visualizer) Start() {
+	v.apiserver.Start()
 	v.StartRunning()
 	go v.eventloop()
 	go v.messageloop()
@@ -59,6 +60,7 @@ func (v *Visualizer) Start() {
 
 // Stop implements Service
 func (v *Visualizer) Stop() {
+	v.apiserver.Stop()
 	v.StopRunning()
 }
 

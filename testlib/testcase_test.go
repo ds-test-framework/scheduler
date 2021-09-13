@@ -20,11 +20,11 @@ func TestBuilderPattern(t *testing.T) {
 	}
 
 	new := builder.
-		On(dummyCond, "new").Do(dummyAction)
+		On(dummyCond, "new").Action(dummyAction)
 
-	new.On(dummyCond, "new2").Do(dummyAction)
+	new.On(dummyCond, "new2").Action(dummyAction)
 
 	new.
-		On(dummyCond, "new1").Do(dummyAction).
+		On(dummyCond, "new1").Action(dummyAction).
 		On(dummyCond, testcase.Fail().Label)
 }

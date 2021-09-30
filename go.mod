@@ -1,4 +1,4 @@
-module github.com/ds-test-framework/scheduler/v2
+module github.com/ds-test-framework/scheduler
 
 go 1.16
 require (

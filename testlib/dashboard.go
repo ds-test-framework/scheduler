@@ -18,8 +18,9 @@ func (srv *TestingServer) Name() string {
 }
 
 type testCaseResponse struct {
-	Name   string            `json:"name"`
-	States map[string]*State `json:"states"`
+	Name    string `json:"name"`
+	Timeout string `json:"timeout"`
+	Handler string `json:"handler"`
 }
 
 func (srv *TestingServer) handleTestCases(c *gin.Context) {
@@ -27,8 +28,9 @@ func (srv *TestingServer) handleTestCases(c *gin.Context) {
 	i := 0
 	for _, t := range srv.testCases {
 		responses[i] = &testCaseResponse{
-			Name:   t.Name,
-			States: t.states,
+			Name:    t.Name,
+			Timeout: t.Timeout.String(),
+			Handler: t.Handler.Name(),
 		}
 		i++
 	}
@@ -49,9 +51,10 @@ func (srv *TestingServer) handleTestCase(c *gin.Context) {
 	}
 	response["testcase"] = &testCaseResponse{
 		testcase.Name,
-		testcase.states,
+		testcase.Timeout.String(),
+		testcase.Handler.Name(),
 	}
-	report, ok := srv.reportStore.GetReport(name)
+	report, ok := srv.ReportStore.GetReport(name)
 	if ok {
 		response["report"] = report
 	}

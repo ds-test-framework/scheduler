@@ -15,7 +15,26 @@ var (
 	ErrDestUnknown = errors.New("destination unknown")
 	// ErrFailedMarshal is returned when the message could not be marshalled
 	ErrFailedMarshal = errors.New("failed to marshal data")
+
+	// Directive action to start the replica
+	startAction = &directiveMessage{
+		Action: "START",
+	}
+
+	// Directive action to stop the replica
+	stopAction = &directiveMessage{
+		Action: "STOP",
+	}
+
+	// Directive action to restart the replica
+	restartAction = &directiveMessage{
+		Action: "RESTART",
+	}
 )
+
+type directiveMessage struct {
+	Action string `json:"action"`
+}
 
 // Dispatcher should be used to send messages to the replicas and handles the marshalling of messages
 type Dispatcher struct {
@@ -49,15 +68,55 @@ func (d *Dispatcher) DispatchMessage(msg *types.Message) error {
 
 // StopReplica should be called to direct the replica to stop running
 func (d *Dispatcher) StopReplica(replica types.ReplicaID) error {
-	return errors.New("not implemented")
+	replicaS, ok := d.Replicas.Get(replica)
+	if !ok {
+		return ErrDestUnknown
+	}
+	return d.sendDirective(stopAction, replicaS.Addr)
 }
 
 // StartReplica should be called to direct the replica to start running
 func (d *Dispatcher) StartReplica(replica types.ReplicaID) error {
-	return errors.New("not implemented")
+	replicaS, ok := d.Replicas.Get(replica)
+	if !ok {
+		return ErrDestUnknown
+	}
+	return d.sendDirective(startAction, replicaS.Addr)
 }
 
 // RestartReplica should be called to direct the replica to restart
 func (d *Dispatcher) RestartReplica(replica types.ReplicaID) error {
-	return errors.New("not implemented")
+	replicaS, ok := d.Replicas.Get(replica)
+	if !ok {
+		return ErrDestUnknown
+	}
+	return d.sendDirective(restartAction, replicaS.Addr)
+}
+
+func (d *Dispatcher) RestartAll() error {
+	errCh := make(chan error, d.Replicas.Cap())
+	for _, r := range d.Replicas.Iter() {
+		go func(errCh chan error, replicaAddr string) {
+			errCh <- d.sendDirective(restartAction, replicaAddr)
+		}(errCh, r.Addr)
+	}
+	for i := 0; i < d.Replicas.Cap(); i++ {
+		err := <-errCh
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Dispatcher) sendDirective(directive *directiveMessage, addr string) error {
+	bytes, err := json.Marshal(directive)
+	if err != nil {
+		return ErrFailedMarshal
+	}
+	_, err = util.SendMsg(http.MethodPost, addr+"/directive", string(bytes), util.JsonRequest())
+	if err != nil {
+		return err
+	}
+	return nil
 }

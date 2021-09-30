@@ -114,16 +114,6 @@ func (d *EventDAG) AddNode(e *Event, parents []*Event) {
 	}
 
 	node := NewEventNode(e)
-	node.AddParents(parentNodes)
-
-	d.nodes.Add(node)
-
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	_, ok := d.strands[e.Replica]
-	if !ok {
-		d.strands[e.Replica] = node
-	}
 	l, ok := d.latestNodes[e.Replica]
 	if ok {
 		l.SetNext(node)
@@ -131,6 +121,18 @@ func (d *EventDAG) AddNode(e *Event, parents []*Event) {
 		d.latestNodes[e.Replica] = node
 	} else {
 		d.latestNodes[e.Replica] = node
+	}
+	parentNodes = append(parentNodes, l)
+
+	node.AddParents(parentNodes)
+
+	d.nodes.Add(node)
+
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	_, ok = d.strands[e.Replica]
+	if !ok {
+		d.strands[e.Replica] = node
 	}
 }
 
@@ -140,6 +142,14 @@ func (d *EventDAG) GetStrand(replica ReplicaID) (*EventNode, bool) {
 	defer d.lock.Unlock()
 	head, ok := d.strands[replica]
 	return head, ok
+}
+
+// GetLatestEvent returns the latest event in that replica strand
+func (d *EventDAG) GetLatestEvent(replica ReplicaID) (*EventNode, bool) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	e, ok := d.latestNodes[replica]
+	return e, ok
 }
 
 func (d *EventDAG) MarshalJSON() ([]byte, error) {

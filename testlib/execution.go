@@ -42,10 +42,9 @@ func (e *executionState) Unblock() {
 func (e *executionState) NewTestCase(ctx *context.RootContext, testcase *TestCase) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.curCtx = NewContext(ctx, testcase)
 	e.testcase = testcase
 	e.report = NewTestCaseReport(testcase.Name)
-	e.report.AddStateTransition(testcase.run.CurState())
+	e.curCtx = NewContext(ctx, testcase, e.report)
 }
 
 func (e *executionState) CurCtx() *Context {
@@ -127,20 +126,21 @@ MainLoop:
 		testcaseLogger.Info("Finalizing")
 		report := srv.executionState.CurReport()
 		ctx := srv.executionState.CurCtx()
-		report.FinalState = testcase.run.CurState()
 		report.EventDAG = ctx.EventDAG
 		report.Assertion = testcase.Assert()
 		if !report.Assertion {
 			testcaseLogger.Info("Testcase failed")
 		}
-		srv.reportStore.AddReport(report)
+		srv.ReportStore.AddReport(report)
 
 		// Reset the servers and flush the queues after waiting for some time
-		//
+		srv.ctx.Reset()
+		if err := srv.dispatcher.RestartAll(); err != nil {
+			srv.Logger.With(log.LogParams{"error": err}).Error("Failed to restart replicas! Aborting!")
+			break MainLoop
+		}
 	}
-	if err := srv.reportStore.Save(); err != nil {
-		srv.Logger.With(log.LogParams{"error": err}).Error("Error saving report")
-	}
+	close(srv.doneCh)
 }
 
 func (srv *TestingServer) pollEvents() {
@@ -153,21 +153,20 @@ func (srv *TestingServer) pollEvents() {
 
 			ctx := srv.executionState.CurCtx()
 			testcase := srv.executionState.CurTestCase()
-			curState := testcase.run.CurState()
 			report := srv.executionState.CurReport()
 			testcaseLogger := srv.Logger.With(log.LogParams{"testcase": testcase.Name})
 
 			testcaseLogger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Debug("Stepping")
 			// 1. Add event to context and feed context to testcase
 			ctx.setEvent(e)
-			messages := testcase.Step(ctx)
-			// 2. Record outgoing messages and state transitions
-			report.AddOutgoingMessages(messages)
-			if !testcase.run.CurState().Eq(curState) {
-				report.AddStateTransition(testcase.run.CurState())
+			messages := testcase.step(ctx)
+
+			select {
+			case <-testcase.doneCh:
+			default:
+				report.AddOutgoingMessages(messages)
+				go srv.dispatchMessages(ctx, messages)
 			}
-			// 3. Dispatch the messages
-			go srv.dispatchMessages(ctx, messages)
 		case <-srv.QuitCh():
 			return
 		}

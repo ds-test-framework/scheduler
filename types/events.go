@@ -31,6 +31,32 @@ type Event struct {
 	Timestamp int64 `json:"timestamp"`
 }
 
+func (e *Event) MessageID() (string, bool) {
+	switch eType := e.Type.(type) {
+	case *MessageReceiveEventType:
+		return eType.MessageID, true
+	case *MessageSendEventType:
+		return eType.MessageID, true
+	}
+	return "", false
+}
+
+func (e *Event) IsMessageSend() bool {
+	switch e.Type.(type) {
+	case *MessageSendEventType:
+		return true
+	}
+	return false
+}
+
+func (e *Event) IsMessageReceive() bool {
+	switch e.Type.(type) {
+	case *MessageReceiveEventType:
+		return true
+	}
+	return false
+}
+
 // Clone implements Clonable
 func (e *Event) Clone() Clonable {
 	return &Event{

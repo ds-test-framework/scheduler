@@ -80,6 +80,15 @@ func (store *ReplicaLogStore) GetLogs(replica ReplicaID, from, to int) ([]*Repli
 	return logs[from:to], len(logs)
 }
 
+func (store *ReplicaLogStore) Reset() {
+	store.lock.Lock()
+	defer store.lock.Unlock()
+
+	for k := range store.logs {
+		store.logs[k] = make([]*ReplicaLog, 0)
+	}
+}
+
 // ReplicaLogQueue is the queue of log messages
 type ReplicaLogQueue struct {
 	logs        []*ReplicaLog

@@ -23,8 +23,9 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unmarshal request"})
 		return
 	}
+	// TODO: dispatch message when it should not be intercepted
+
 	srv.ctx.MessageStore.Add(&msg)
-	// TODO: logic for dispatching the message if it should not be intercepted
 	srv.ctx.MessageQueue.Add(&msg)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

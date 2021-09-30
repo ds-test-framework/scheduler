@@ -107,10 +107,18 @@ func (s *MessageStore) Remove(id string) *Message {
 	return nil
 }
 
+// Size returns the size of the message store
 func (s *MessageStore) Size() int {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	return len(s.messages)
+}
+
+// RemoveAll empties the message store
+func (s *MessageStore) RemoveAll() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.messages = make(map[string]*Message)
 }
 
 // MessageQueue datastructure to store the messages in a FIFO queue

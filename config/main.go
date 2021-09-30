@@ -21,8 +21,6 @@ type Config struct {
 	APIServerAddr string `json:"server_addr"`
 	// LogConfig configuration for logging
 	LogConfig LogConfig `json:"log"`
-	// ReportStoreConfig config for recording unit test reports
-	ReportStoreConfig ReportStoreConfig `json:"report_store"`
 }
 
 // LogConfig stores the config for logging purpose
@@ -33,12 +31,6 @@ type LogConfig struct {
 	Format string `json:"format"`
 	// Level log level, one of panic|fatal|error|warn|warning|info|debug|trace
 	Level string `json:"level"`
-}
-
-// ReportStoreConfig configuration of the unit test reports
-type ReportStoreConfig struct {
-	Path    string `json:"path"`
-	OldPath string `json:"old_path"`
 }
 
 // PatseConfig parses config from the specificied file
@@ -55,9 +47,6 @@ func ParseConfig(path string) (*Config, error) {
 			Path:   "",
 			Format: "json",
 			Level:  "info",
-		},
-		ReportStoreConfig: ReportStoreConfig{
-			Path: "test_reports",
 		},
 	}
 	err = json.Unmarshal(bytes, &defaultConfig)

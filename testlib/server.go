@@ -14,12 +14,13 @@ type TestingServer struct {
 	apiserver  *apiserver.APIServer
 	dispatcher *dispatcher.Dispatcher
 	ctx        *context.RootContext
-	messagesCh chan *types.Message
 	eventCh    chan *types.Event
+
+	doneCh chan string
 
 	testCases      map[string]*TestCase
 	executionState *executionState
-	reportStore    *TestCaseReportStore
+	ReportStore    *TestCaseReportStore
 	*types.BaseService
 }
 
@@ -33,11 +34,11 @@ func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingSer
 		apiserver:      nil,
 		dispatcher:     dispatcher.NewDispatcher(ctx),
 		ctx:            ctx,
-		messagesCh:     ctx.MessageQueue.Subscribe("testingServer"),
 		eventCh:        ctx.EventQueue.Subscribe("testingServer"),
+		doneCh:         make(chan string),
 		testCases:      make(map[string]*TestCase),
 		executionState: newExecutionState(),
-		reportStore:    NewTestCaseReportStore(config.ReportStoreConfig),
+		ReportStore:    NewTestCaseReportStore(),
 		BaseService:    types.NewBaseService("TestingServer", log.DefaultLogger),
 	}
 	for _, t := range testcases {
@@ -64,21 +65,8 @@ func (srv *TestingServer) Start() {
 	<-srv.QuitCh()
 }
 
-func (srv *TestingServer) poll() {
-	for {
-		select {
-		case m := <-srv.messagesCh:
-			err := srv.dispatcher.DispatchMessage(m)
-			if err != nil {
-				srv.Logger.With(log.LogParams{
-					"message_id": m.ID,
-					"err":        err.Error(),
-				}).Error("error dispatching message")
-			}
-		case <-srv.QuitCh():
-			return
-		}
-	}
+func (srv *TestingServer) Done() chan string {
+	return srv.doneCh
 }
 
 // Stop stops the TestingServer and implements Service

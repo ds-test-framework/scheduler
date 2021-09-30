@@ -57,3 +57,12 @@ func (c *RootContext) Stop() {
 	c.EventQueue.Stop()
 	c.LogQueue.Stop()
 }
+
+func (c *RootContext) Reset() {
+	c.MessageQueue.Flush()
+	c.EventQueue.Flush()
+	c.LogQueue.Flush()
+
+	c.MessageStore.RemoveAll()
+	c.LogStore.Reset()
+}

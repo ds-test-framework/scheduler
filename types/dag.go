@@ -119,10 +119,10 @@ func (d *EventDAG) AddNode(e *Event, parents []*Event) {
 		l.SetNext(node)
 		node.SetPrev(l)
 		d.latestNodes[e.Replica] = node
+		parentNodes = append(parentNodes, l)
 	} else {
 		d.latestNodes[e.Replica] = node
 	}
-	parentNodes = append(parentNodes, l)
 
 	node.AddParents(parentNodes)
 

@@ -103,7 +103,7 @@ MainLoop:
 		// Setup
 		testcaseLogger.Debug("Setting up testcase")
 		srv.executionState.NewTestCase(srv.ctx, testcase)
-		err := testcase.Setup(srv.executionState.CurCtx())
+		err := testcase.setup(srv.executionState.CurCtx())
 		if err != nil {
 			testcaseLogger.With(log.LogParams{"error": err}).Error("Error setting up testcase")
 			goto Finalize
@@ -114,6 +114,7 @@ MainLoop:
 		select {
 		case <-testcase.doneCh:
 		case <-time.After(testcase.Timeout):
+			testcaseLogger.Info("Testcase timedout")
 		case <-srv.QuitCh():
 			break MainLoop
 		}
@@ -127,12 +128,19 @@ MainLoop:
 		report := srv.executionState.CurReport()
 		ctx := srv.executionState.CurCtx()
 		report.EventDAG = ctx.EventDAG
-		report.Assertion = testcase.Assert()
+		if testcase.aborted {
+			testcaseLogger.Info("Testcase was aborted")
+			report.Assertion = false
+		} else {
+			testcaseLogger.Info("Checking assertion")
+			report.Assertion = testcase.assert(ctx)
+		}
 		if !report.Assertion {
 			testcaseLogger.Info("Testcase failed")
 		}
 		srv.ReportStore.AddReport(report)
 
+		// TODO: Figure out a way to cleanly clear the message pool
 		// Reset the servers and flush the queues after waiting for some time
 		srv.ctx.Reset()
 		if err := srv.dispatcher.RestartAll(); err != nil {

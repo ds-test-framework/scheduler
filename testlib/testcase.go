@@ -54,10 +54,11 @@ type TestCase struct {
 	Name string
 	// Timeout maximum duration of the testcase execution
 	Timeout time.Duration
-	// Setup function called prior to initiation of the execution
-	Setup   func(*Context) error
-	Handler Handler
-	success bool
+	// setup function called prior to initiation of the execution
+	setup    func(*Context) error
+	assertFn func(*Context) bool
+	Handler  Handler
+	aborted  bool
 	// Logger to log information
 	Logger *log.Logger
 
@@ -69,6 +70,10 @@ func defaultSetupFunc(c *Context) error {
 	return nil
 }
 
+func defaultAssertFunc(c *Context) bool {
+	return false
+}
+
 // NewTestCase instantiates a TestCase based on the parameters specified
 // The new testcase has three states by default.
 // - Start state where the execution starts from
@@ -76,18 +81,15 @@ func defaultSetupFunc(c *Context) error {
 // - Success state that can be used to indicate a success of the testcase
 func NewTestCase(name string, timeout time.Duration, handler Handler) *TestCase {
 	return &TestCase{
-		Name:    name,
-		Timeout: timeout,
-		Handler: handler,
-		Setup:   defaultSetupFunc,
-		success: false,
-		doneCh:  make(chan string, 1),
-		once:    new(sync.Once),
+		Name:     name,
+		Timeout:  timeout,
+		Handler:  handler,
+		setup:    defaultSetupFunc,
+		assertFn: defaultAssertFunc,
+		aborted:  false,
+		doneCh:   make(chan string, 1),
+		once:     new(sync.Once),
 	}
-}
-
-func (t *TestCase) Succeed() {
-	t.success = true
 }
 
 func (t *TestCase) End() {
@@ -97,7 +99,7 @@ func (t *TestCase) End() {
 }
 
 func (t *TestCase) Abort() {
-	t.success = false
+	t.aborted = true
 	t.once.Do(func() {
 		close(t.doneCh)
 	})
@@ -108,13 +110,17 @@ func (t *TestCase) step(c *Context) []*types.Message {
 	return t.Handler.HandleEvent(c)
 }
 
-// Assert returns true if the testcase statemachine is in the success state
-// or if the curState is marked as success
-func (t *TestCase) Assert() bool {
-	return t.success
-}
-
 // SetupFunc can be used to set the setup function
 func (t *TestCase) SetupFunc(setupFunc func(*Context) error) {
-	t.Setup = setupFunc
+	t.setup = setupFunc
+}
+
+type AssertFunc func(*Context) bool
+
+func (t *TestCase) AssertFn(fn AssertFunc) {
+	t.assertFn = fn
+}
+
+func (t *TestCase) assert(c *Context) bool {
+	return t.assertFn(c)
 }

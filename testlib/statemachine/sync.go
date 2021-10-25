@@ -156,9 +156,7 @@ func (s *SyncStateMachineHandler) HandleEvent(c *testlib.Context) []*types.Messa
 	}
 
 	newState := s.StateMachine.CurState()
-	if newState.Success {
-		c.Success()
-	} else if newState.Label == FailStateLabel {
+	if newState.Label == FailStateLabel {
 		c.Abort()
 	}
 

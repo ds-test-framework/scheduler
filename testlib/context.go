@@ -65,10 +65,6 @@ func (c *Context) EndTestCase() {
 	c.testcase.End()
 }
 
-func (c *Context) Success() {
-	c.testcase.Succeed()
-}
-
 func (c *Context) AddReportLog(message string, params map[string]interface{}) {
 	c.report.Log.AddMessage(message, params)
 }

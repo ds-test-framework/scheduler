@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/testlib"
 	"github.com/ds-test-framework/scheduler/types"
 )
@@ -152,6 +153,9 @@ func (s *StateMachine) step(c *Context) {
 		if t(c) {
 			next, ok := s.states[to]
 			if ok {
+				c.Logger().With(log.LogParams{
+					"state": to,
+				}).Info("Testcase transistioned")
 				s.run.Transition(next)
 			}
 		}

@@ -57,6 +57,32 @@ func (e *Event) IsMessageReceive() bool {
 	return false
 }
 
+func (e *Event) Timeout() (*ReplicaTimeout, bool) {
+	switch eType := e.Type.(type) {
+	case *TimeoutStartEventType:
+		return eType.Timeout, true
+	case *TimeoutEndEventType:
+		return eType.Timeout, true
+	}
+	return nil, false
+}
+
+func (e *Event) IsTimeoutStart() bool {
+	switch e.Type.(type) {
+	case *TimeoutStartEventType:
+		return true
+	}
+	return false
+}
+
+func (e *Event) IsTimeoutEnd() bool {
+	switch e.Type.(type) {
+	case *TimeoutEndEventType:
+		return true
+	}
+	return false
+}
+
 // Clone implements Clonable
 func (e *Event) Clone() Clonable {
 	return &Event{

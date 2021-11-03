@@ -23,7 +23,8 @@ type Context struct {
 	EventDAG *types.EventDAG
 	// Vars is a generic key value store to facilate maintaining auxilliary information
 	// during the execution of a testcase
-	Vars *Vars
+	Vars          *Vars
+	TimeoutDriver *TimeoutDriver
 
 	counter  *util.Counter
 	testcase *TestCase
@@ -36,11 +37,12 @@ type Context struct {
 // NewContext instantiates a Context from the RootContext
 func NewContext(c *context.RootContext, testcase *TestCase, report *TestCaseReport) *Context {
 	return &Context{
-		MessagePool: c.MessageStore,
-		Replicas:    c.Replicas,
-		CurEvent:    nil,
-		EventDAG:    types.NewEventDag(),
-		Vars:        NewVarSet(),
+		MessagePool:   c.MessageStore,
+		Replicas:      c.Replicas,
+		CurEvent:      nil,
+		EventDAG:      types.NewEventDag(),
+		Vars:          NewVarSet(),
+		TimeoutDriver: NewTimeoutDriver(c.TimeoutStore),
 
 		counter:  util.NewCounter(),
 		testcase: testcase,
@@ -97,5 +99,6 @@ func (c *Context) setEvent(e *types.Event) {
 		c.sends[eventType.MessageID] = e
 	}
 	c.EventDAG.AddNode(e, parents)
+	c.TimeoutDriver.NewEvent(e)
 	c.CurEvent = e
 }

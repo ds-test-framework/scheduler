@@ -98,6 +98,26 @@ func (d *Dispatcher) DispatchMessage(msg *types.Message) error {
 	return nil
 }
 
+func (d *Dispatcher) DispatchTimeout(t *types.ReplicaTimeout) error {
+	d.logger.With(log.LogParams{
+		"timeout_type": t.Type,
+		"duration":     t.Duration.String(),
+	}).Debug("Dispatching timeout")
+	replica, ok := d.Replicas.Get(t.Replica)
+	if !ok {
+		return ErrDestUnknown
+	}
+	bytes, err := json.Marshal(t)
+	if err != nil {
+		return ErrFailedMarshal
+	}
+	_, err = d.sendReq(replica, "/timeout", bytes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // StopReplica should be called to direct the replica to stop running
 func (d *Dispatcher) StopReplica(replica types.ReplicaID) error {
 	replicaS, ok := d.Replicas.Get(replica)

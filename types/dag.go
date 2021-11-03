@@ -14,6 +14,7 @@ type EventNode struct {
 	Parents *EventNodeSet `json:"parents"`
 	// Children is the set of child nodes
 	Children *EventNodeSet `json:"children"`
+	dirty    bool
 	lock     *sync.Mutex
 }
 
@@ -25,6 +26,7 @@ func NewEventNode(e *Event) *EventNode {
 		next:     nil,
 		Parents:  NewEventNodeSet(),
 		Children: NewEventNodeSet(),
+		dirty:    false,
 		lock:     new(sync.Mutex),
 	}
 }
@@ -55,6 +57,18 @@ func (n *EventNode) GetNext() *EventNode {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	return n.next
+}
+
+func (n *EventNode) MarkDirty() {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.dirty = true
+}
+
+func (n *EventNode) MarkClean() {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.dirty = false
 }
 
 // AddParents updates Parents, Ancestors of the current node and

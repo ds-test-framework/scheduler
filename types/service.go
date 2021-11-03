@@ -17,7 +17,7 @@ type Service interface {
 	// Stop to stop the service
 	Stop() error
 	// Quit returns a channel which will be closed once the service stops running
-	Quit() <-chan struct{}
+	QuitCh() <-chan struct{}
 }
 
 // RestartableService is a service which can be restarted

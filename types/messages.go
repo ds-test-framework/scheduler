@@ -132,6 +132,8 @@ type MessageQueue struct {
 	*BaseService
 }
 
+var _ Service = &MessageQueue{}
+
 // NewMessageQueue returens an emtpy MessageQueue
 func NewMessageQueue(logger *log.Logger) *MessageQueue {
 	return &MessageQueue{

@@ -11,6 +11,8 @@ import (
 var (
 	messageSendEventType    = "MessageSend"
 	messageReceiveEventType = "MessageReceive"
+	timeoutStartEventType   = "TimeoutStart"
+	timeoutEndEventType     = "TimeoutEnd"
 )
 
 // HandleMessage is the handler for the route `/message`
@@ -78,6 +80,20 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 	case messageReceiveEventType:
 		messageID := e.Params["message_id"]
 		eventType = types.NewMessageReceiveEventType(messageID)
+	case timeoutStartEventType:
+		timeout, ok := types.TimeoutFromParams(e.Replica, e.Params)
+		if ok {
+			eventType = types.NewTimeoutStartEventType(timeout)
+		} else {
+			eventType = types.NewGenericEventType(e.Params, e.TypeS)
+		}
+	case timeoutEndEventType:
+		timeout, ok := types.TimeoutFromParams(e.Replica, e.Params)
+		if ok {
+			eventType = types.NewTimeoutEndEventType(timeout)
+		} else {
+			eventType = types.NewGenericEventType(e.Params, e.TypeS)
+		}
 	default:
 		eventType = types.NewGenericEventType(e.Params, e.TypeS)
 	}

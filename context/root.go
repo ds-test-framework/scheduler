@@ -23,6 +23,8 @@ type RootContext struct {
 	EventQueue *types.EventQueue
 	// LogQueue stores the log messages sent by the replicas as a queue
 	LogQueue *types.ReplicaLogQueue
+	// TimeoutStore stores the timeouts that are dispatched by the replica and contains the strategy
+	TimeoutStore *types.TimeoutStore
 	// Counter is a thread safe monotonic integer counter
 	Counter *util.Counter
 	// Logger for logging purposes
@@ -39,6 +41,7 @@ func NewRootContext(config *config.Config, logger *log.Logger) *RootContext {
 		MessageStore: types.NewMessageStore(),
 		EventQueue:   types.NewEventQueue(logger),
 		LogQueue:     types.NewReplicaLogQueue(logger),
+		TimeoutStore: types.NewTimeoutStore(logger),
 		Counter:      util.NewCounter(),
 		Logger:       logger,
 	}
@@ -49,6 +52,7 @@ func (c *RootContext) Start() {
 	c.MessageQueue.Start()
 	c.EventQueue.Start()
 	c.LogQueue.Start()
+	c.TimeoutStore.Start()
 }
 
 // Stop implements Service and terminates the queues

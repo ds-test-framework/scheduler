@@ -86,7 +86,7 @@ func (ts *TimeoutStartEventType) Type() string {
 }
 
 func (ts *TimeoutStartEventType) String() string {
-	return fmt.Sprintf("TimeoutStart { %s }", ts.Timeout.Type)
+	return fmt.Sprintf("TimeoutStart { %s, %s }", ts.Timeout.Replica, ts.Timeout.Type)
 }
 
 type TimeoutEndEventType struct {
@@ -110,7 +110,7 @@ func (te *TimeoutEndEventType) Type() string {
 }
 
 func (te *TimeoutEndEventType) String() string {
-	return fmt.Sprintf("TimeoutEnd { %s }", te.Timeout.Type)
+	return fmt.Sprintf("TimeoutEnd { %s, %s }", te.Timeout.Replica, te.Timeout.Type)
 }
 
 // GenericEventType is the event type published by a replica

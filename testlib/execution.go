@@ -168,12 +168,14 @@ func (srv *TestingServer) pollEvents() {
 			// 1. Add event to context and feed context to testcase
 			ctx.setEvent(e)
 			messages := testcase.step(ctx)
+			timeouts := ctx.TimeoutDriver.ToDispatch()
 
 			select {
 			case <-testcase.doneCh:
 			default:
 				report.AddOutgoingMessages(messages)
 				go srv.dispatchMessages(ctx, messages)
+				go srv.dispatchTimeouts(timeouts)
 			}
 		case <-srv.QuitCh():
 			return
@@ -187,5 +189,11 @@ func (srv *TestingServer) dispatchMessages(ctx *Context, messages []*types.Messa
 			ctx.MessagePool.Add(m)
 		}
 		srv.dispatcher.DispatchMessage(m)
+	}
+}
+
+func (srv *TestingServer) dispatchTimeouts(timeouts []*types.ReplicaTimeout) {
+	for _, t := range timeouts {
+		srv.dispatcher.DispatchTimeout(t)
 	}
 }

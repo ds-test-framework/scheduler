@@ -150,6 +150,11 @@ func (s *TimeoutStore) AddTimeout(t *ReplicaTimeout) {
 	}
 	s.timeouts[key] = t
 	s.lock.Unlock()
+	s.Logger.With(log.LogParams{
+		"type":     t.Type,
+		"duration": t.Duration.String(),
+		"replica":  t.Replica,
+	}).Debug("Scheduling timeout")
 	s.wg.Add(1)
 	go s.scheduleTimeout(t)
 }
@@ -207,6 +212,11 @@ func (s *TimeoutStore) poll() {
 	for {
 		select {
 		case t := <-s.outChan:
+			s.Logger.With(log.LogParams{
+				"type":     t.Type,
+				"duration": t.Duration.String(),
+				"replica":  t.Replica,
+			}).Debug("Ending timeout")
 			s.lock.Lock()
 			key := fmt.Sprintf("%s_%s", t.Replica, t.Type)
 			_, ok := s.timeouts[key]

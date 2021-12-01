@@ -98,13 +98,13 @@ func (srv *APIServer) HandleEvent(c *gin.Context) {
 		eventType = types.NewGenericEventType(e.Params, e.TypeS)
 	}
 
-	srv.ctx.EventQueue.Add(&types.Event{
-		Replica:   e.Replica,
-		Type:      eventType,
-		TypeS:     eventType.String(),
-		ID:        uint64(srv.gen.Next()),
-		Timestamp: e.Timestamp,
-	})
+	srv.ctx.EventQueue.Add(types.NewEvent(
+		e.Replica,
+		eventType,
+		eventType.String(),
+		uint64(srv.gen.Next()),
+		e.Timestamp,
+	))
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

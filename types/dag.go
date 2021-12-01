@@ -5,25 +5,83 @@ import (
 	"sync"
 )
 
-// EventNode is a node of the event acyclic directed graph
+type EventNodeSet struct {
+	nodes map[uint64]bool
+	lock  *sync.Mutex
+}
+
+func NewEventNodeSet() *EventNodeSet {
+	return &EventNodeSet{
+		nodes: make(map[uint64]bool),
+		lock:  new(sync.Mutex),
+	}
+}
+
+func (d *EventNodeSet) Clone() *EventNodeSet {
+	return &EventNodeSet{
+		nodes: d.nodes,
+		lock:  new(sync.Mutex),
+	}
+}
+
+func (d *EventNodeSet) Add(nid uint64) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	d.nodes[nid] = true
+}
+
+func (d *EventNodeSet) Exists(nid uint64) bool {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	_, ok := d.nodes[nid]
+	return ok
+}
+
+func (d *EventNodeSet) Iter() []uint64 {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	nodes := make([]uint64, len(d.nodes))
+	i := 0
+	for k, _ := range d.nodes {
+		nodes[i] = k
+		i = i + 1
+	}
+	return nodes
+}
+
+func (d *EventNodeSet) Size() int {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	return len(d.nodes)
+}
+
+func (d *EventNodeSet) MarshalJSON() ([]byte, error) {
+	d.lock.Lock()
+	nodes := make([]uint64, len(d.nodes))
+	i := 0
+	for n, _ := range d.nodes {
+		nodes[i] = n
+		i = i + 1
+	}
+	d.lock.Unlock()
+	return json.Marshal(nodes)
+}
+
 type EventNode struct {
-	Event *Event `json:"event"`
-	prev  *EventNode
-	next  *EventNode
-	// Parents is the set of parent nodes
-	Parents *EventNodeSet `json:"parents"`
-	// Children is the set of child nodes
+	Event    *Event `json:"event"`
+	prev     uint64
+	next     uint64
+	Parents  *EventNodeSet `json:"parents"`
 	Children *EventNodeSet `json:"children"`
 	dirty    bool
 	lock     *sync.Mutex
 }
 
-// NewEventNode instantiates a new EventNode
 func NewEventNode(e *Event) *EventNode {
 	return &EventNode{
 		Event:    e,
-		prev:     nil,
-		next:     nil,
+		prev:     0,
+		next:     0,
 		Parents:  NewEventNodeSet(),
 		Children: NewEventNodeSet(),
 		dirty:    false,
@@ -31,32 +89,40 @@ func NewEventNode(e *Event) *EventNode {
 	}
 }
 
-// SetPrev sets the prev attribute (thread safe) in  the current node's strand
-func (n *EventNode) SetPrev(prev *EventNode) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	n.prev = prev
+func (n *EventNode) Clone() *EventNode {
+	return &EventNode{
+		Event:    n.Event,
+		prev:     n.prev,
+		next:     n.next,
+		Parents:  n.Parents.Clone(),
+		Children: n.Children.Clone(),
+		dirty:    false,
+		lock:     new(sync.Mutex),
+	}
 }
 
-// GetPrev returns the previous node in the strand (prev attribute)
-func (n *EventNode) GetPrev() *EventNode {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-	return n.prev
-}
-
-// SetNext sets the next attibute (thread safe)
-func (n *EventNode) SetNext(next *EventNode) {
+func (n *EventNode) SetNext(next uint64) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	n.next = next
 }
 
-// GetNext returns the next node of the current node's strand
-func (n *EventNode) GetNext() *EventNode {
+func (n *EventNode) GetNext() uint64 {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	return n.next
+}
+
+func (n *EventNode) SetPrev(prev uint64) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.prev = prev
+}
+
+func (n *EventNode) GetPrev() uint64 {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	return n.prev
 }
 
 func (n *EventNode) MarkDirty() {
@@ -71,112 +137,262 @@ func (n *EventNode) MarkClean() {
 	n.dirty = false
 }
 
-// AddParents updates Parents, Ancestors of the current node and
-// Children, Descendants of the parent and ancestor nodes respectively
 func (n *EventNode) AddParents(parents []*EventNode) {
-	for _, parent := range parents {
-		n.Parents.Add(parent)
-		parent.Children.Add(n)
+	for _, p := range parents {
+		n.Parents.Add(p.Event.ID)
+		p.Children.Add(n.Event.ID)
 	}
 }
 
-func (n *EventNode) MarshalJSON() ([]byte, error) {
-	keyvals := make(map[string]interface{})
-	keyvals["event"] = n.Event
-	keyvals["parents"] = n.Parents
-	keyvals["children"] = n.Children
-	keyvals["prev"] = nil
-	keyvals["next"] = nil
-
+func (n *EventNode) IsDirty() bool {
 	n.lock.Lock()
-	if n.prev != nil {
-		keyvals["prev"] = n.prev.Event.ID
-	}
-	if n.next != nil {
-		keyvals["next"] = n.next.Event.ID
-	}
-	n.lock.Unlock()
-
-	return json.Marshal(keyvals)
+	defer n.lock.Unlock()
+	return n.dirty
 }
 
-// EventDAG is the directed acyclic graph of events
 type EventDAG struct {
-	nodes       *EventNodeSet
-	strands     map[ReplicaID]*EventNode
-	latestNodes map[ReplicaID]*EventNode
-	lock        *sync.Mutex
+	nodes   map[uint64]*EventNode
+	strands map[ReplicaID]uint64
+	latest  map[ReplicaID]uint64
+	lock    *sync.Mutex
+
+	cleanCopies map[uint64]*EventNode
+	cleanLock   *sync.Mutex
 }
 
-// NewEventDag instantiates EventDAG
 func NewEventDag() *EventDAG {
 	return &EventDAG{
-		nodes:       NewEventNodeSet(),
-		strands:     make(map[ReplicaID]*EventNode),
-		latestNodes: make(map[ReplicaID]*EventNode),
-		lock:        new(sync.Mutex),
+		nodes:   make(map[uint64]*EventNode),
+		strands: make(map[ReplicaID]uint64),
+		latest:  make(map[ReplicaID]uint64),
+		lock:    new(sync.Mutex),
+
+		cleanCopies: make(map[uint64]*EventNode),
+		cleanLock:   new(sync.Mutex),
 	}
 }
 
-// AddNode adds an event with the respective parent nodes
+func (d *EventDAG) GetNode(eid uint64) (*EventNode, bool) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	node, ok := d.nodes[eid]
+	return node, ok
+}
+
+func (d *EventDAG) Clone() *EventDAG {
+	nodes := make(map[uint64]*EventNode)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	for nid, node := range d.nodes {
+		nodes[nid] = node.Clone()
+	}
+	return &EventDAG{
+		nodes:       nodes,
+		strands:     d.strands,
+		latest:      d.latest,
+		lock:        new(sync.Mutex),
+		cleanCopies: make(map[uint64]*EventNode),
+		cleanLock:   new(sync.Mutex),
+	}
+}
+
 func (d *EventDAG) AddNode(e *Event, parents []*Event) {
-	parentNodes := make([]*EventNode, 0)
-	for _, parent := range parents {
-		if d.nodes.Has(parent.ID) {
-			parentNodes = append(parentNodes, d.nodes.Get(parent.ID))
+	parentNodes := make([]*EventNode, len(parents))
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	for _, p := range parents {
+		pN, ok := d.nodes[p.ID]
+		if ok {
+			parentNodes = append(parentNodes, pN)
 		}
 	}
-
 	node := NewEventNode(e)
-	l, ok := d.latestNodes[e.Replica]
+	d.nodes[e.ID] = node
+
+	l, ok := d.latest[e.Replica]
 	if ok {
-		l.SetNext(node)
-		node.SetPrev(l)
-		d.latestNodes[e.Replica] = node
-		parentNodes = append(parentNodes, l)
-	} else {
-		d.latestNodes[e.Replica] = node
+		lN := d.nodes[l]
+		lN.SetNext(e.ID)
+		node.SetPrev(lN.Event.ID)
+		parentNodes = append(parentNodes, lN)
 	}
+	d.latest[e.Replica] = e.ID
 
 	node.AddParents(parentNodes)
 
-	d.nodes.Add(node)
-
-	d.lock.Lock()
-	defer d.lock.Unlock()
 	_, ok = d.strands[e.Replica]
 	if !ok {
-		d.strands[e.Replica] = node
+		d.strands[e.Replica] = e.ID
 	}
 }
 
-// GetStrand returns the strand of events for that particular replica
-func (d *EventDAG) GetStrand(replica ReplicaID) (*EventNode, bool) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	head, ok := d.strands[replica]
-	return head, ok
+func (d *EventDAG) markDirty(n *EventNode) {
+	d.cleanLock.Lock()
+	d.cleanCopies[n.Event.ID] = n.Clone()
+	d.cleanLock.Unlock()
+	n.MarkDirty()
 }
 
-// GetLatestEvent returns the latest event in that replica strand
-func (d *EventDAG) GetLatestEvent(replica ReplicaID) (*EventNode, bool) {
+func (d *EventDAG) AddDirty(e *Event, parents []*Event) {
+	parentNodes := make([]*EventNode, len(parents))
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	e, ok := d.latestNodes[replica]
-	return e, ok
+	for _, p := range parents {
+		pN, ok := d.nodes[p.ID]
+		if ok {
+			parentNodes = append(parentNodes, pN)
+			d.markDirty(pN)
+		}
+	}
+	node := NewEventNode(e)
+	node.MarkDirty()
+
+	l, ok := d.latest[e.Replica]
+	if ok {
+		lN := d.nodes[l]
+		lN.SetNext(e.ID)
+		node.SetPrev(lN.Event.ID)
+		parentNodes = append(parentNodes, lN)
+		d.markDirty(lN)
+	}
+	d.latest[e.Replica] = e.ID
+
+	node.AddParents(parentNodes)
+	_, ok = d.strands[e.Replica]
+	if !ok {
+		d.strands[e.Replica] = e.ID
+	}
+}
+
+func (d *EventDAG) Clean() {
+	dirtyNodes := make([]uint64, 0)
+	d.lock.Lock()
+	for id, node := range d.nodes {
+		if node.IsDirty() {
+			dirtyNodes = append(dirtyNodes, id)
+		}
+	}
+	d.lock.Unlock()
+	d.cleanLock.Lock()
+	for _, dID := range dirtyNodes {
+		if cleanCopy, ok := d.cleanCopies[dID]; ok {
+			d.nodes[dID] = cleanCopy
+			delete(d.cleanCopies, dID)
+		} else {
+			delete(d.nodes, dID)
+		}
+	}
+	d.cleanLock.Unlock()
 }
 
 func (d *EventDAG) MarshalJSON() ([]byte, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	keyvals := make(map[string]interface{})
-	nodes := make(map[uint64]*EventNode, d.nodes.Size())
+	nodes := make(map[uint64]*EventNode, len(d.nodes))
 
-	for _, node := range d.nodes.Iter() {
-		nodes[node.Event.ID] = node
+	for id, node := range d.nodes {
+		nodes[id] = node
 	}
 
 	keyvals["nodes"] = nodes
 	keyvals["strands"] = d.strands
 	return json.MarshalIndent(keyvals, "", "\t")
+}
+
+func (d *EventDAG) GetSendNode(e *Event) (*Event, bool) {
+	if !e.IsMessageReceive() {
+		return nil, false
+	}
+	mesageID, _ := e.MessageID()
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	node, ok := d.nodes[e.ID]
+	if !ok {
+		return nil, false
+	}
+	for _, p := range node.Parents.Iter() {
+		pN := d.nodes[p]
+		if pN.Event.IsMessageSend() {
+			mID, _ := pN.Event.MessageID()
+			if mID == mesageID {
+				return pN.Event, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (d *EventDAG) GetReceiveNode(e *Event) (*Event, bool) {
+	if !e.IsMessageSend() {
+		return nil, false
+	}
+	mesageID, _ := e.MessageID()
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	node, ok := d.nodes[e.ID]
+	if !ok {
+		return nil, false
+	}
+	for _, p := range node.Parents.Iter() {
+		pN := d.nodes[p]
+		if pN.Event.IsMessageReceive() {
+			mID, _ := pN.Event.MessageID()
+			if mID == mesageID {
+				return pN.Event, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (d *EventDAG) GetTimeoutStart(e *Event) (*Event, bool) {
+	if !e.IsTimeoutEnd() {
+		return nil, false
+	}
+	timeout, _ := e.Timeout()
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	node, ok := d.nodes[e.ID]
+	if !ok {
+		return nil, false
+	}
+	for _, p := range node.Parents.Iter() {
+		pN := d.nodes[p]
+		if pN.Event.IsTimeoutStart() {
+			t, _ := pN.Event.Timeout()
+			if timeout.Eq(t) {
+				return pN.Event, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (d *EventDAG) GetTimeoutEnd(e *Event) (*Event, bool) {
+	if !e.IsTimeoutStart() {
+		return nil, false
+	}
+	timeout, _ := e.Timeout()
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	node, ok := d.nodes[e.ID]
+	if !ok {
+		return nil, false
+	}
+	for _, p := range node.Parents.Iter() {
+		pN := d.nodes[p]
+		if pN.Event.IsTimeoutEnd() {
+			t, _ := pN.Event.Timeout()
+			if timeout.Eq(t) {
+				return pN.Event, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (d *EventDAG) GetLatestNode(e *Event) (*Event, bool) {
+	return nil, false
 }

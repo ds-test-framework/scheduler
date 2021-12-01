@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/ds-test-framework/scheduler/log"
@@ -29,6 +28,30 @@ type Event struct {
 	ID uint64 `json:"id"`
 	// Timestamp of the event
 	Timestamp int64 `json:"timestamp"`
+	// Vector clock value of the event
+	ClockValue ClockValue
+}
+
+func NewEvent(replica ReplicaID, t EventType, ts string, id uint64, time int64) *Event {
+	return &Event{
+		Replica:    replica,
+		Type:       t,
+		TypeS:      ts,
+		ID:         id,
+		Timestamp:  time,
+		ClockValue: nil,
+	}
+}
+
+// Returns true if the current event is less than `other`
+func (e *Event) Lt(other *Event) bool {
+	if e.ClockValue == nil {
+		return true
+	}
+	if other.ClockValue == nil {
+		return false
+	}
+	return e.ClockValue.Lt(other.ClockValue)
 }
 
 func (e *Event) MessageID() (string, bool) {
@@ -94,87 +117,6 @@ func (e *Event) Clone() Clonable {
 	}
 }
 
-// EventNodeSet implements the set data structure of EventNode(s)
-type EventNodeSet struct {
-	nodes map[uint64]*EventNode
-	lock  *sync.Mutex
-}
-
-// NewEventNodeSet instantiates EventNodeSet
-func NewEventNodeSet() *EventNodeSet {
-	return &EventNodeSet{
-		nodes: make(map[uint64]*EventNode),
-		lock:  new(sync.Mutex),
-	}
-}
-
-// Add adds to the EventNodeSet
-func (s *EventNodeSet) Add(n *EventNode) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.nodes[n.Event.ID] = n
-}
-
-// Get returns the EVentNode if it exists and nil otherwise
-func (s *EventNodeSet) Get(id uint64) *EventNode {
-	s.lock.Lock()
-	n, ok := s.nodes[id]
-	s.lock.Unlock()
-	if !ok {
-		return nil
-	}
-	return n
-}
-
-// Iter returns a list of all event nodes
-func (s *EventNodeSet) Iter() []*EventNode {
-	result := make([]*EventNode, len(s.nodes))
-	i := 0
-	s.lock.Lock()
-	for _, n := range s.nodes {
-		result[i] = n
-		i++
-	}
-	s.lock.Unlock()
-	return result
-}
-
-// Union computes the union of the two sets
-func (s *EventNodeSet) Union(n *EventNodeSet) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for _, node := range n.Iter() {
-		s.nodes[node.Event.ID] = node
-	}
-}
-
-// Has returns true if the event exists in the set
-func (s *EventNodeSet) Has(id uint64) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	_, ok := s.nodes[id]
-	return ok
-}
-
-// Size returns the size of the set
-func (s *EventNodeSet) Size() int {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return len(s.nodes)
-}
-
-func (s *EventNodeSet) MarshalJSON() ([]byte, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	ids := make([]uint64, len(s.nodes))
-	i := 0
-	for id := range s.nodes {
-		ids[i] = id
-		i++
-	}
-	return json.Marshal(ids)
-}
-
 // EventQueue datastructure to store the messages in a FIFO queue
 type EventQueue struct {
 	events      []*Event
@@ -185,7 +127,7 @@ type EventQueue struct {
 	*BaseService
 }
 
-// NewEventQueue returens an emtpy EventQueue
+// NewEventQueue returns an empty EventQueue
 func NewEventQueue(logger *log.Logger) *EventQueue {
 	return &EventQueue{
 		events:      make([]*Event, 0),

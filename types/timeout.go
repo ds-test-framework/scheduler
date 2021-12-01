@@ -23,6 +23,10 @@ func (t *ReplicaTimeout) MarshalJSON() ([]byte, error) {
 	})
 }
 
+func (t *ReplicaTimeout) Eq(other *ReplicaTimeout) bool {
+	return t.Replica == other.Replica && t.Type == other.Type && t.Duration == other.Duration
+}
+
 func TimeoutFromParams(replica ReplicaID, params map[string]string) (*ReplicaTimeout, bool) {
 	t := &ReplicaTimeout{
 		Replica: replica,

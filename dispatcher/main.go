@@ -70,6 +70,8 @@ func NewDispatcher(ctx *context.RootContext) *Dispatcher {
 }
 
 // DispatchMessage should be called to send an _intercepted_ message to a replica
+// DispatchMessage sends a message with a particular ID only once,
+// will return ErrDuplicateDispatch on successive calls
 func (d *Dispatcher) DispatchMessage(msg *types.Message) error {
 	d.lock.Lock()
 	_, ok := d.dispatchedMessages[msg.ID]
@@ -98,6 +100,8 @@ func (d *Dispatcher) DispatchMessage(msg *types.Message) error {
 	return nil
 }
 
+// Send a timeout message to the replica
+// This is the equivalent of ending a timeout at the replica
 func (d *Dispatcher) DispatchTimeout(t *types.ReplicaTimeout) error {
 	d.logger.With(log.LogParams{
 		"timeout_type": t.Type,
@@ -145,6 +149,7 @@ func (d *Dispatcher) RestartReplica(replica types.ReplicaID) error {
 	return d.sendDirective(restartAction, replicaS)
 }
 
+// RestartAll restarts all the replicas
 func (d *Dispatcher) RestartAll() error {
 	errCh := make(chan error, d.Replicas.Cap())
 	for _, r := range d.Replicas.Iter() {

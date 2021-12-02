@@ -147,10 +147,10 @@ func (s *StateMachine) newState(label string) *State {
 	return newState
 }
 
-func (s *StateMachine) step(c *Context) {
+func (s *StateMachine) step(e *types.Event, c *Context) {
 	state := s.run.CurState()
 	for to, t := range state.Transitions {
-		if t(c) {
+		if t(e, c) {
 			next, ok := s.states[to]
 			if ok {
 				c.Logger().With(log.LogParams{
@@ -162,17 +162,13 @@ func (s *StateMachine) step(c *Context) {
 	}
 }
 
-// Condition type for specifying a transition condition
-// Condition function is called for every new event that the testing library receives
-type Condition func(*Context) bool
+type EventHandler func(*types.Event, *Context) ([]*types.Message, bool)
 
-type EventHandler func(*Context) ([]*types.Message, bool)
-
-func defaultSendHandler(c *Context) ([]*types.Message, bool) {
-	if !c.CurEvent.IsMessageSend() {
+func defaultSendHandler(e *types.Event, c *Context) ([]*types.Message, bool) {
+	if !e.IsMessageSend() {
 		return []*types.Message{}, true
 	}
-	messageID, _ := c.CurEvent.MessageID()
+	messageID, _ := e.MessageID()
 	message, ok := c.MessagePool.Get(messageID)
 	if ok {
 		return []*types.Message{message}, true

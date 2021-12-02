@@ -2,6 +2,8 @@ package testlib
 
 import (
 	"sync"
+
+	"github.com/ds-test-framework/scheduler/types"
 )
 
 // Vars is a dictionary for storing auxilliary state during the execution of the testcase
@@ -69,4 +71,64 @@ func (v *Vars) Exists(label string) bool {
 	defer v.lock.Unlock()
 	_, ok := v.vars[label]
 	return ok
+}
+
+func (v *Vars) SetCounter(label string) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	counter := NewCounter()
+	counter.Incr()
+	v.vars[label] = counter
+}
+
+func (v *Vars) GetCounter(label string) (*Counter, bool) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	cI, exists := v.vars[label]
+	if !exists {
+		return nil, false
+	}
+	counter, ok := cI.(*Counter)
+	return counter, ok
+}
+
+func (v *Vars) NewMessageSet(label string) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	v.vars[label] = types.NewMessageStore()
+}
+
+func (v *Vars) GetMessageSet(label string) (*types.MessageStore, bool) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	sI, exists := v.vars[label]
+	if !exists {
+		return nil, false
+	}
+	set, ok := sI.(*types.MessageStore)
+	return set, ok
+}
+
+type Counter struct {
+	val  int
+	lock *sync.Mutex
+}
+
+func NewCounter() *Counter {
+	return &Counter{
+		val:  0,
+		lock: new(sync.Mutex),
+	}
+}
+
+func (c *Counter) Incr() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.val = c.val + 1
+}
+
+func (c *Counter) Value() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.val
 }

@@ -16,7 +16,7 @@ func If(c Condition) *IfThenElseHandler {
 	}
 }
 
-func doNothingHandler(c *Context) ([]*types.Message, bool) {
+func doNothingHandler(e *types.Event, c *Context) ([]*types.Message, bool) {
 	return []*types.Message{}, false
 }
 
@@ -32,11 +32,67 @@ func (h *IfThenElseHandler) ThenElse(then EventHandler, el EventHandler) EventHa
 }
 
 func (h *IfThenElseHandler) Handler() EventHandler {
-	return func(c *Context) ([]*types.Message, bool) {
-		if h.cond(c) {
-			return h.then(c)
+	return func(e *types.Event, c *Context) ([]*types.Message, bool) {
+		if h.cond(e, c) {
+			return h.then(e, c)
 		} else if h.el != nil {
-			return h.el(c)
+			return h.el(e, c)
+		}
+		return []*types.Message{}, false
+	}
+}
+
+func DeliverMessage(e *types.Event, c *Context) ([]*types.Message, bool) {
+	if !e.IsMessageSend() {
+		return []*types.Message{}, false
+	}
+	messageID, _ := e.MessageID()
+	message, ok := c.MessagePool.Get(messageID)
+	if ok {
+		return []*types.Message{message}, true
+	}
+	return []*types.Message{}, false
+}
+
+func DontDeliverMessage(e *types.Event, c *Context) ([]*types.Message, bool) {
+	if !e.IsMessageSend() {
+		return []*types.Message{}, false
+	}
+	messageID, _ := e.MessageID()
+	_, ok := c.MessagePool.Get(messageID)
+	return []*types.Message{}, ok
+}
+
+func RecordMessage(label string) EventHandler {
+	return func(e *types.Event, c *Context) ([]*types.Message, bool) {
+		if !e.IsMessageSend() {
+			return []*types.Message{}, false
+		}
+		messageID, _ := e.MessageID()
+		message, ok := c.MessagePool.Get(messageID)
+		if ok {
+			c.Vars.Set(label, message)
+			return []*types.Message{}, true
+		}
+		return []*types.Message{}, false
+	}
+}
+
+func AddToSet(label string) EventHandler {
+	return func(e *types.Event, c *Context) ([]*types.Message, bool) {
+		if !e.IsMessageSend() {
+			return []*types.Message{}, false
+		}
+		messageID, _ := e.MessageID()
+		message, ok := c.MessagePool.Get(messageID)
+		if ok {
+			set, ok := c.Vars.GetMessageSet(label)
+			if !ok {
+				c.Vars.NewMessageSet(label)
+				set, _ = c.Vars.GetMessageSet(label)
+			}
+			set.Add(message)
+			return []*types.Message{}, true
 		}
 		return []*types.Message{}, false
 	}

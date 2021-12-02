@@ -102,11 +102,11 @@ func (s *SyncStateMachineHandler) countAndUpdateRound(r Round, from types.Replic
 
 }
 
-func (s *SyncStateMachineHandler) HandleEvent(c *testlib.Context) []*types.Message {
+func (s *SyncStateMachineHandler) HandleEvent(e *types.Event, c *testlib.Context) []*types.Message {
 	// Group messages to rounds and keep track before delivering messages
 
-	if c.CurEvent.IsMessageSend() {
-		messageID, _ := c.CurEvent.MessageID()
+	if e.IsMessageSend() {
+		messageID, _ := e.MessageID()
 		message, ok := c.MessagePool.Get(messageID)
 		if ok {
 			round := s.extractRound(message)
@@ -132,7 +132,7 @@ func (s *SyncStateMachineHandler) HandleEvent(c *testlib.Context) []*types.Messa
 	result := make([]*types.Message, 0)
 	ctx := wrapContext(c, s.StateMachine)
 	for _, handler := range s.EventHandlers {
-		hResponse, ok := handler(ctx)
+		hResponse, ok := handler(e, ctx)
 		if ok {
 			handled = true
 			result = hResponse
@@ -140,7 +140,7 @@ func (s *SyncStateMachineHandler) HandleEvent(c *testlib.Context) []*types.Messa
 		}
 	}
 	if !handled {
-		result, _ = defaultSendHandler(ctx)
+		result, _ = defaultSendHandler(e, ctx)
 	}
 
 	for _, message := range result {

@@ -167,7 +167,7 @@ func (srv *TestingServer) pollEvents() {
 			testcaseLogger.With(log.LogParams{"event_id": e.ID, "type": e.TypeS}).Debug("Stepping")
 			// 1. Add event to context and feed context to testcase
 			ctx.setEvent(e)
-			messages := testcase.step(ctx)
+			messages := testcase.step(e, ctx)
 			timeouts := ctx.TimeoutDriver.ToDispatch()
 
 			select {

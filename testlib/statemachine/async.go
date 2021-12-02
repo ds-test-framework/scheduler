@@ -20,16 +20,16 @@ func NewAsyncStateMachineHandler(stateMachine *StateMachine) *AsyncStateMachineH
 	}
 }
 
-func (a *AsyncStateMachineHandler) HandleEvent(c *testlib.Context) []*types.Message {
+func (a *AsyncStateMachineHandler) HandleEvent(e *types.Event, c *testlib.Context) []*types.Message {
 	c.Logger().With(log.LogParams{
-		"event_id":   c.CurEvent.ID,
-		"event_type": c.CurEvent.TypeS,
+		"event_id":   e.ID,
+		"event_type": e.TypeS,
 	}).Debug("Async state machine handler step")
 	ctx := wrapContext(c, a.StateMachine)
 	result := make([]*types.Message, 0)
 	handled := false
 	for i, handler := range a.EventHandlers {
-		messages, h := handler(ctx)
+		messages, h := handler(e, ctx)
 		if h {
 			c.Logger().With(log.LogParams{
 				"handler_index": i,
@@ -40,10 +40,10 @@ func (a *AsyncStateMachineHandler) HandleEvent(c *testlib.Context) []*types.Mess
 		}
 	}
 	if !handled {
-		result, _ = defaultSendHandler(ctx)
+		result, _ = defaultSendHandler(e, ctx)
 	}
 
-	a.StateMachine.step(ctx)
+	a.StateMachine.step(e, ctx)
 	newState := a.StateMachine.CurState()
 	if newState.Is(FailStateLabel) {
 		c.Abort()

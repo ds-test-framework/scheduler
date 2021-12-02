@@ -9,11 +9,11 @@ import (
 )
 
 type Handler interface {
-	HandleEvent(*Context) []*types.Message
+	HandleEvent(*types.Event, *Context) []*types.Message
 	Name() string
 }
 
-type HandlerFunc func(*Context) []*types.Message
+type HandlerFunc func(*types.Event, *Context) []*types.Message
 
 type GenericHandler struct {
 	handlerFunc HandlerFunc
@@ -25,8 +25,8 @@ func NewGenericHandler(f HandlerFunc) *GenericHandler {
 	}
 }
 
-func (g *GenericHandler) HandleEvent(c *Context) []*types.Message {
-	return g.handlerFunc(c)
+func (g *GenericHandler) HandleEvent(e *types.Event, c *Context) []*types.Message {
+	return g.handlerFunc(e, c)
 }
 
 func (g *GenericHandler) Name() string {
@@ -36,7 +36,7 @@ func (g *GenericHandler) Name() string {
 type DoNothingHandler struct {
 }
 
-func (d *DoNothingHandler) HandleEvent(_ *Context) []*types.Message {
+func (d *DoNothingHandler) HandleEvent(_ *types.Event, _ *Context) []*types.Message {
 	return []*types.Message{}
 }
 
@@ -106,8 +106,8 @@ func (t *TestCase) Abort() {
 }
 
 // Step is called to execute a step of the testcase with a new event
-func (t *TestCase) step(c *Context) []*types.Message {
-	return t.Handler.HandleEvent(c)
+func (t *TestCase) step(e *types.Event, c *Context) []*types.Message {
+	return t.Handler.HandleEvent(e, c)
 }
 
 // SetupFunc can be used to set the setup function

@@ -62,6 +62,7 @@ func (c *RootContext) Stop() {
 	c.LogQueue.Stop()
 }
 
+// Reset implements Service
 func (c *RootContext) Reset() {
 	c.MessageQueue.Flush()
 	c.EventQueue.Flush()

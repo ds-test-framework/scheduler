@@ -41,5 +41,3 @@ func NewGlobalClock(dag *EventDAG, messageStore *MessageStore) *GlobalClock {
 		messageStore: messageStore,
 	}
 }
-
-func (c *GlobalClock) GetClockValue(e *Event, parents []*Event)

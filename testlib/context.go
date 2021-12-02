@@ -17,8 +17,6 @@ type Context struct {
 	MessagePool *types.MessageStore
 	// Replicas reference to the replica store
 	Replicas *types.ReplicaStore
-	// CurEvent is the event that was processed latest
-	CurEvent *types.Event
 	// EventDAG is the directed acyclic graph all prior events
 	EventDAG *types.EventDAG
 	// Vars is a generic key value store to facilate maintaining auxilliary information
@@ -39,7 +37,6 @@ func NewContext(c *context.RootContext, testcase *TestCase, report *TestCaseRepo
 	return &Context{
 		MessagePool:   c.MessageStore,
 		Replicas:      c.Replicas,
-		CurEvent:      nil,
 		EventDAG:      types.NewEventDag(),
 		Vars:          NewVarSet(),
 		TimeoutDriver: NewTimeoutDriver(c.TimeoutStore),
@@ -100,5 +97,4 @@ func (c *Context) setEvent(e *types.Event) {
 	}
 	c.EventDAG.AddNode(e, parents)
 	c.TimeoutDriver.NewEvent(e)
-	c.CurEvent = e
 }

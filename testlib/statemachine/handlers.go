@@ -78,6 +78,13 @@ func RecordMessage(label string) EventHandler {
 	}
 }
 
+func RecordEvent(label string) EventHandler {
+	return func(e *types.Event, c *Context) ([]*types.Message, bool) {
+		c.Vars.Set(label, e)
+		return []*types.Message{}, true
+	}
+}
+
 func AddToSet(label string) EventHandler {
 	return func(e *types.Event, c *Context) ([]*types.Message, bool) {
 		if !e.IsMessageSend() {

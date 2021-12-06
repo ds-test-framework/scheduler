@@ -18,7 +18,7 @@ func TestTestingServer(t *testing.T) {
 
 	srv, err := NewTestingServer(&config.Config{
 		APIServerAddr: "192.168.0.2:7074",
-	}, []*TestCase{NewTestCase("dummy", 2*time.Second, &DoNothingHandler{})})
+	}, nil, []*TestCase{NewTestCase("dummy", 2*time.Second, &DoNothingHandler{})})
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)

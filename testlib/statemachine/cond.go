@@ -29,3 +29,34 @@ func (c Condition) Not() Condition {
 		return !c(e, ctx)
 	}
 }
+
+func IsMessageSend() Condition {
+	return func(e *types.Event, ctx *Context) bool {
+		return e.IsMessageSend()
+	}
+}
+
+func IsMessageReceive() Condition {
+	return func(e *types.Event, ctx *Context) bool {
+		return e.IsMessageReceive()
+	}
+}
+
+func BaseCondition(e *types.Event, c *Context) bool {
+
+	return false
+}
+
+func MessageInSet(label string) Condition {
+	return func(e *types.Event, c *Context) bool {
+		if !e.IsMessageSend() && !e.IsMessageReceive() {
+			return false
+		}
+		mID, _ := e.MessageID()
+		set, ok := c.Vars.GetMessageSet(label)
+		if !ok {
+			return false
+		}
+		return set.Exists(mID)
+	}
+}

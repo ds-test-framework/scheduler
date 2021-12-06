@@ -21,10 +21,11 @@ const DefaultAddr = "0.0.0.0:7074"
 // APIServer runs a HTTP server to receive messages from
 // the replicas and provide an interactive dashboard
 type APIServer struct {
-	router    *gin.Engine
-	ctx       *context.RootContext
-	gen       *util.Counter
-	dashboard DashboardRouter
+	router        *gin.Engine
+	ctx           *context.RootContext
+	gen           *util.Counter
+	dashboard     DashboardRouter
+	messageParser types.MessageParser
 
 	server *http.Server
 	addr   string
@@ -33,14 +34,15 @@ type APIServer struct {
 }
 
 // NewAPIServer instantiates APIServer
-func NewAPIServer(ctx *context.RootContext, dashboard DashboardRouter) *APIServer {
+func NewAPIServer(ctx *context.RootContext, messageParser types.MessageParser, dashboard DashboardRouter) *APIServer {
 
 	server := &APIServer{
-		gen:         ctx.Counter,
-		ctx:         ctx,
-		addr:        ctx.Config.APIServerAddr,
-		dashboard:   dashboard,
-		BaseService: types.NewBaseService("APIServer", ctx.Logger),
+		gen:           ctx.Counter,
+		ctx:           ctx,
+		addr:          ctx.Config.APIServerAddr,
+		dashboard:     dashboard,
+		messageParser: messageParser,
+		BaseService:   types.NewBaseService("APIServer", ctx.Logger),
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()

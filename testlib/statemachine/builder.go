@@ -1,5 +1,7 @@
 package statemachine
 
+import "github.com/ds-test-framework/scheduler/testlib/handlers"
+
 // StateMachineBuilder implements a builder pattern for creating the testcase state machine
 type StateMachineBuilder struct {
 	stateMachine *StateMachine
@@ -7,7 +9,7 @@ type StateMachineBuilder struct {
 }
 
 // On can be used to create a transition relation between states based on the specified condition
-func (s StateMachineBuilder) On(cond Condition, stateLabel string) StateMachineBuilder {
+func (s StateMachineBuilder) On(cond handlers.Condition, stateLabel string) StateMachineBuilder {
 	next, ok := s.stateMachine.getState(stateLabel)
 	if !ok {
 		next = s.stateMachine.newState(stateLabel)

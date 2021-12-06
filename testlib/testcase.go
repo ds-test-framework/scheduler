@@ -13,26 +13,6 @@ type Handler interface {
 	Name() string
 }
 
-type HandlerFunc func(*types.Event, *Context) []*types.Message
-
-type GenericHandler struct {
-	handlerFunc HandlerFunc
-}
-
-func NewGenericHandler(f HandlerFunc) *GenericHandler {
-	return &GenericHandler{
-		handlerFunc: f,
-	}
-}
-
-func (g *GenericHandler) HandleEvent(e *types.Event, c *Context) []*types.Message {
-	return g.handlerFunc(e, c)
-}
-
-func (g *GenericHandler) Name() string {
-	return "GenericHandler"
-}
-
 type DoNothingHandler struct {
 }
 
@@ -46,7 +26,6 @@ func (d *DoNothingHandler) Name() string {
 
 // Type assertion
 var _ Handler = &DoNothingHandler{}
-var _ Handler = &GenericHandler{}
 
 // TestCase represents a unit test case
 type TestCase struct {

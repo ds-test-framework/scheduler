@@ -6,6 +6,7 @@ import (
 
 	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/testlib"
+	"github.com/ds-test-framework/scheduler/testlib/handlers"
 	"github.com/ds-test-framework/scheduler/types"
 )
 
@@ -17,9 +18,9 @@ const (
 
 // State of the testcase state machine
 type State struct {
-	Label       string               `json:"label"`
-	Transitions map[string]Condition `json:"-"`
-	Success     bool                 `json:"success"`
+	Label       string                        `json:"label"`
+	Transitions map[string]handlers.Condition `json:"-"`
+	Success     bool                          `json:"success"`
 
 	handler EventHandler
 }
@@ -92,19 +93,19 @@ func NewStateMachine() *StateMachine {
 	startState := &State{
 		Label:       StartStateLabel,
 		Success:     false,
-		Transitions: make(map[string]Condition),
+		Transitions: make(map[string]handlers.Condition),
 	}
 	m.states[StartStateLabel] = startState
 	m.run = newRun(startState)
 	m.states[FailStateLabel] = &State{
 		Label:       FailStateLabel,
 		Success:     false,
-		Transitions: make(map[string]Condition),
+		Transitions: make(map[string]handlers.Condition),
 	}
 	m.states[SuccessStateLabel] = &State{
 		Label:       SuccessStateLabel,
 		Success:     true,
-		Transitions: make(map[string]Condition),
+		Transitions: make(map[string]handlers.Condition),
 	}
 	return m
 }
@@ -139,7 +140,7 @@ func (s *StateMachine) newState(label string) *State {
 	}
 	newState := &State{
 		Label:       label,
-		Transitions: make(map[string]Condition),
+		Transitions: make(map[string]handlers.Condition),
 		Success:     false,
 		handler:     nil,
 	}
@@ -147,7 +148,7 @@ func (s *StateMachine) newState(label string) *State {
 	return newState
 }
 
-func (s *StateMachine) step(e *types.Event, c *Context) {
+func (s *StateMachine) step(e *types.Event, c *testlib.Context) {
 	state := s.run.CurState()
 	for to, t := range state.Transitions {
 		if t(e, c) {
@@ -157,8 +158,19 @@ func (s *StateMachine) step(e *types.Event, c *Context) {
 					"state": to,
 				}).Info("Testcase transistioned")
 				s.run.Transition(next)
+				c.Vars.Set("curState", to)
 			}
 		}
+	}
+}
+
+func InState(state string) handlers.Condition {
+	return func(e *types.Event, c *testlib.Context) bool {
+		curState, ok := c.Vars.GetString("curState")
+		if !ok {
+			return false
+		}
+		return curState == state
 	}
 }
 

@@ -79,6 +79,14 @@ func (c *Context) NewMessage(cur *types.Message, data []byte) *types.Message {
 	}
 }
 
+func (c *Context) GetMessage(e *types.Event) (*types.Message, bool) {
+	if !e.IsMessageSend() && !e.IsMessageReceive() {
+		return nil, false
+	}
+	mID, _ := e.MessageID()
+	return c.MessagePool.Get(mID)
+}
+
 func (c *Context) setEvent(e *types.Event) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

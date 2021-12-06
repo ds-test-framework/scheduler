@@ -11,10 +11,11 @@ import (
 
 // TestingServer is used to run the scheduler tool for unit testing
 type TestingServer struct {
-	apiserver  *apiserver.APIServer
-	dispatcher *dispatcher.Dispatcher
-	ctx        *context.RootContext
-	eventCh    chan *types.Event
+	apiserver     *apiserver.APIServer
+	dispatcher    *dispatcher.Dispatcher
+	ctx           *context.RootContext
+	eventCh       chan *types.Event
+	messageParser types.MessageParser
 
 	doneCh chan string
 
@@ -26,7 +27,7 @@ type TestingServer struct {
 
 // NewTestingServer instantiates TestingServer
 // testcases are passed as arguments
-func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingServer, error) {
+func NewTestingServer(config *config.Config, messageParser types.MessageParser, testcases []*TestCase) (*TestingServer, error) {
 	log.Init(config.LogConfig)
 	ctx := context.NewRootContext(config, log.DefaultLogger)
 
@@ -35,6 +36,7 @@ func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingSer
 		dispatcher:     dispatcher.NewDispatcher(ctx),
 		ctx:            ctx,
 		eventCh:        ctx.EventQueue.Subscribe("testingServer"),
+		messageParser:  messageParser,
 		doneCh:         make(chan string),
 		testCases:      make(map[string]*TestCase),
 		executionState: newExecutionState(),
@@ -45,7 +47,7 @@ func NewTestingServer(config *config.Config, testcases []*TestCase) (*TestingSer
 		server.testCases[t.Name] = t
 	}
 
-	server.apiserver = apiserver.NewAPIServer(ctx, server)
+	server.apiserver = apiserver.NewAPIServer(ctx, messageParser, server)
 
 	for _, t := range testcases {
 		t.Logger = server.Logger.With(log.LogParams{"testcase": t.Name})

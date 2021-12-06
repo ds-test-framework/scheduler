@@ -27,6 +27,8 @@ func (srv *APIServer) HandleMessage(c *gin.Context) {
 	}
 	// TODO: dispatch message when it should not be intercepted
 
+	msg.Parse(srv.messageParser)
+
 	srv.ctx.MessageStore.Add(&msg)
 	srv.ctx.MessageQueue.Add(&msg)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})

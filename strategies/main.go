@@ -50,7 +50,7 @@ func NewDriver(ctx *context.RootContext, strategy Strategy) *Driver {
 		ctx:         ctx,
 		BaseService: types.NewBaseService("StrategyDriver", ctx.Logger),
 	}
-	d.apiserver = apiserver.NewAPIServer(ctx, d)
+	d.apiserver = apiserver.NewAPIServer(ctx, nil, d)
 	return d
 }
 

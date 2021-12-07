@@ -60,14 +60,18 @@ func (c *Context) Abort() {
 	c.testcase.Abort()
 }
 
+// Ends the testcase without failing. The assertion will determine the success of the testcase
 func (c *Context) EndTestCase() {
 	c.testcase.End()
 }
 
+// AddReportLog to add a message to the log stored as a report of the testcase run
 func (c *Context) AddReportLog(message string, params map[string]interface{}) {
 	c.report.Log.AddMessage(message, params)
 }
 
+// NewMessage crafts a new message with a new ID
+// The current message contents are replaced with `data`
 func (c *Context) NewMessage(cur *types.Message, data []byte) *types.Message {
 	return &types.Message{
 		From:      cur.From,
@@ -79,6 +83,8 @@ func (c *Context) NewMessage(cur *types.Message, data []byte) *types.Message {
 	}
 }
 
+// GetMessage returns the `Message` struct from the Message pool
+// if the event provided is a message send ot receive event
 func (c *Context) GetMessage(e *types.Event) (*types.Message, bool) {
 	if !e.IsMessageSend() && !e.IsMessageReceive() {
 		return nil, false
@@ -103,6 +109,10 @@ func (c *Context) setEvent(e *types.Event) {
 		eventType := e.Type.(*types.MessageSendEventType)
 		c.sends[eventType.MessageID] = e
 	}
+	c.Logger().With(log.LogParams{
+		"event_id": e.ID,
+		"parents":  parents,
+	}).Debug("Adding node to DAG")
 	c.EventDAG.AddNode(e, parents)
-	c.TimeoutDriver.NewEvent(e)
+	// c.TimeoutDriver.NewEvent(e)
 }

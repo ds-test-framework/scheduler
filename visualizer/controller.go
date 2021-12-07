@@ -46,7 +46,7 @@ func NewVisualizer(ctx *context.RootContext) *Visualizer {
 		wg:           new(sync.WaitGroup),
 		BaseService:  types.NewBaseService("Visualizer", log.DefaultLogger),
 	}
-	v.apiserver = apiserver.NewAPIServer(ctx, v)
+	v.apiserver = apiserver.NewAPIServer(ctx, nil, v)
 	return v
 }
 

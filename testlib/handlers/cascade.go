@@ -5,6 +5,9 @@ import (
 	"github.com/ds-test-framework/scheduler/types"
 )
 
+// HandlerCascade implements Handler
+// Executes handlers in the specified order until the event is handled
+// If no handler handles the event then the default handler is called
 type HandlerCascade struct {
 	Handlers       []HandlerFunc
 	DefaultHandler HandlerFunc
@@ -24,14 +27,26 @@ func defaultHandler(e *types.Event, c *testlib.Context) ([]*types.Message, bool)
 	return []*types.Message{}, true
 }
 
+// HandlerCascadeOption changes the parameters of the HandlerCascade
 type HandlerCascadeOption func(*HandlerCascade)
 
+// WithDefault changes the HandlerCascade default handler
 func WithDefault(d HandlerFunc) HandlerCascadeOption {
 	return func(hc *HandlerCascade) {
 		hc.DefaultHandler = d
 	}
 }
 
+// WithStateMachine adds the state machine handler at the head
+func WithStateMachine(sm *StateMachine) HandlerCascadeOption {
+	return func(hc *HandlerCascade) {
+		handlers := []HandlerFunc{NewStateMachineHandler(sm)}
+		handlers = append(handlers, hc.Handlers...)
+		hc.Handlers = handlers
+	}
+}
+
+// NewHandlerCascade creates a new cascade handler with the specified options
 func NewHandlerCascade(opts ...HandlerCascadeOption) *HandlerCascade {
 	h := &HandlerCascade{
 		Handlers:       make([]HandlerFunc, 0),
@@ -43,22 +58,18 @@ func NewHandlerCascade(opts ...HandlerCascadeOption) *HandlerCascade {
 	return h
 }
 
-func (h HandlerFunc) Then(next HandlerFunc) *HandlerCascade {
-	c := NewHandlerCascade()
-	c.AddHandler(h)
-	c.AddHandler(next)
-	return c
-}
-
+// AddHandler adds a handler to the cascade
 func (c *HandlerCascade) AddHandler(h HandlerFunc) {
 	c.Handlers = append(c.Handlers, h)
 }
 
+// Then adds a handler to the cascade and returns the cascade
 func (c *HandlerCascade) Then(next HandlerFunc) *HandlerCascade {
 	c.Handlers = append(c.Handlers, next)
 	return c
 }
 
+// HandleEvent implements Handler
 func (c *HandlerCascade) HandleEvent(e *types.Event, ctx *testlib.Context) []*types.Message {
 	for _, h := range c.Handlers {
 		ret, ok := h(e, ctx)

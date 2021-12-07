@@ -8,23 +8,29 @@ import (
 	"github.com/ds-test-framework/scheduler/types"
 )
 
+// Handler defines the interface for specifying the execution of the testcase
 type Handler interface {
+	// HandleEvent is called with every new event that is encountered
+	// Returns the messages that should be delivered based on the current event seen
 	HandleEvent(*types.Event, *Context) []*types.Message
+	// Name of the handler
 	Name() string
 }
 
+// DoNothing Handler does not return any messages for any event
 type DoNothingHandler struct {
 }
 
+// HandleEvent implements Handler
 func (d *DoNothingHandler) HandleEvent(_ *types.Event, _ *Context) []*types.Message {
 	return []*types.Message{}
 }
 
+// Name implements Handler
 func (d *DoNothingHandler) Name() string {
 	return "DoNothing"
 }
 
-// Type assertion
 var _ Handler = &DoNothingHandler{}
 
 // TestCase represents a unit test case
@@ -71,12 +77,14 @@ func NewTestCase(name string, timeout time.Duration, handler Handler) *TestCase 
 	}
 }
 
+// End the testcase
 func (t *TestCase) End() {
 	t.once.Do(func() {
 		close(t.doneCh)
 	})
 }
 
+// Abort the testcase
 func (t *TestCase) Abort() {
 	t.aborted = true
 	t.once.Do(func() {
@@ -94,8 +102,10 @@ func (t *TestCase) SetupFunc(setupFunc func(*Context) error) {
 	t.setup = setupFunc
 }
 
+// AssertFunc should return true if the assertion is valid
 type AssertFunc func(*Context) bool
 
+// AssertFn sets the assersion function that will be called at the end of the testcase
 func (t *TestCase) AssertFn(fn AssertFunc) {
 	t.assertFn = fn
 }

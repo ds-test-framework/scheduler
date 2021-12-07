@@ -1,4 +1,4 @@
-package statemachine
+package handlers
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/ds-test-framework/scheduler/log"
 	"github.com/ds-test-framework/scheduler/testlib"
-	"github.com/ds-test-framework/scheduler/testlib/handlers"
 	"github.com/ds-test-framework/scheduler/types"
 )
 
@@ -16,13 +15,34 @@ const (
 	SuccessStateLabel = "successState"
 )
 
+type StateMachineBuilder struct {
+	stateMachine *StateMachine
+	curState     *State
+}
+
+// On can be used to create a transition relation between states based on the specified condition
+func (s StateMachineBuilder) On(cond Condition, stateLabel string) StateMachineBuilder {
+	next, ok := s.stateMachine.getState(stateLabel)
+	if !ok {
+		next = s.stateMachine.newState(stateLabel)
+	}
+	s.curState.Transitions[next.Label] = cond
+	return StateMachineBuilder{
+		stateMachine: s.stateMachine,
+		curState:     next,
+	}
+}
+
+func (s StateMachineBuilder) MarkSuccess() StateMachineBuilder {
+	s.curState.Success = true
+	return s
+}
+
 // State of the testcase state machine
 type State struct {
-	Label       string                        `json:"label"`
-	Transitions map[string]handlers.Condition `json:"-"`
-	Success     bool                          `json:"success"`
-
-	handler EventHandler
+	Label       string               `json:"label"`
+	Transitions map[string]Condition `json:"-"`
+	Success     bool                 `json:"success"`
 }
 
 func (s *State) Is(l string) bool {
@@ -93,19 +113,19 @@ func NewStateMachine() *StateMachine {
 	startState := &State{
 		Label:       StartStateLabel,
 		Success:     false,
-		Transitions: make(map[string]handlers.Condition),
+		Transitions: make(map[string]Condition),
 	}
 	m.states[StartStateLabel] = startState
 	m.run = newRun(startState)
 	m.states[FailStateLabel] = &State{
 		Label:       FailStateLabel,
 		Success:     false,
-		Transitions: make(map[string]handlers.Condition),
+		Transitions: make(map[string]Condition),
 	}
 	m.states[SuccessStateLabel] = &State{
 		Label:       SuccessStateLabel,
 		Success:     true,
-		Transitions: make(map[string]handlers.Condition),
+		Transitions: make(map[string]Condition),
 	}
 	return m
 }
@@ -140,9 +160,8 @@ func (s *StateMachine) newState(label string) *State {
 	}
 	newState := &State{
 		Label:       label,
-		Transitions: make(map[string]handlers.Condition),
+		Transitions: make(map[string]Condition),
 		Success:     false,
-		handler:     nil,
 	}
 	s.states[label] = newState
 	return newState
@@ -164,38 +183,29 @@ func (s *StateMachine) step(e *types.Event, c *testlib.Context) {
 	}
 }
 
-func InState(state string) handlers.Condition {
+func (s *StateMachine) InSuccessState() bool {
+	return s.run.CurState().Success
+}
+
+func InState(state string) Condition {
 	return func(e *types.Event, c *testlib.Context) bool {
 		curState, ok := c.Vars.GetString("curState")
-		if !ok {
-			return false
+		return ok && curState == state
+	}
+}
+
+func NewStateMachineHandler(stateMachine *StateMachine) HandlerFunc {
+	return func(e *types.Event, c *testlib.Context) ([]*types.Message, bool) {
+		c.Logger().With(log.LogParams{
+			"event_id":   e.ID,
+			"event_type": e.TypeS,
+		}).Debug("Async state machine handler step")
+		stateMachine.step(e, c)
+		newState := stateMachine.CurState()
+		if newState.Is(FailStateLabel) {
+			c.Abort()
 		}
-		return curState == state
-	}
-}
 
-type EventHandler func(*types.Event, *Context) ([]*types.Message, bool)
-
-func defaultSendHandler(e *types.Event, c *Context) ([]*types.Message, bool) {
-	if !e.IsMessageSend() {
-		return []*types.Message{}, true
-	}
-	messageID, _ := e.MessageID()
-	message, ok := c.MessagePool.Get(messageID)
-	if ok {
-		return []*types.Message{message}, true
-	}
-	return []*types.Message{}, true
-}
-
-type Context struct {
-	*testlib.Context
-	StateMachine *StateMachine
-}
-
-func wrapContext(c *testlib.Context, m *StateMachine) *Context {
-	return &Context{
-		Context:      c,
-		StateMachine: m,
+		return []*types.Message{}, false
 	}
 }

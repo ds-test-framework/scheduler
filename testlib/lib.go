@@ -31,6 +31,7 @@ func (v *Vars) Get(label string) (interface{}, bool) {
 	return val, ok
 }
 
+// GetInt casts the value at label (if it exists) into integer and returns it
 func (v *Vars) GetInt(label string) (int, bool) {
 	val, ok := v.Get(label)
 	if !ok {
@@ -40,6 +41,7 @@ func (v *Vars) GetInt(label string) (int, bool) {
 	return valInt, ok
 }
 
+// GetString casts the value at label (if it exists) into string and returns it
 func (v *Vars) GetString(label string) (string, bool) {
 	val, ok := v.Get(label)
 	if !ok {
@@ -49,6 +51,7 @@ func (v *Vars) GetString(label string) (string, bool) {
 	return valS, ok
 }
 
+// GetBool casts the value at label (if it exists) into boolean and returns it
 func (v *Vars) GetBool(label string) (bool, bool) {
 	val, ok := v.Get(label)
 	if !ok {
@@ -73,6 +76,7 @@ func (v *Vars) Exists(label string) bool {
 	return ok
 }
 
+// SetCounter sets a counter instance at the specified label
 func (v *Vars) SetCounter(label string) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
@@ -81,6 +85,7 @@ func (v *Vars) SetCounter(label string) {
 	v.vars[label] = counter
 }
 
+// GetCounter returns the counter at the label if it exists (nil, false) otherwise
 func (v *Vars) GetCounter(label string) (*Counter, bool) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
@@ -92,12 +97,14 @@ func (v *Vars) GetCounter(label string) (*Counter, bool) {
 	return counter, ok
 }
 
+// NewMessageSet creates a message set at the specified label
 func (v *Vars) NewMessageSet(label string) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 	v.vars[label] = types.NewMessageStore()
 }
 
+// GetMessageSet returns the message set at label if one exists (nil, false) otherwise
 func (v *Vars) GetMessageSet(label string) (*types.MessageStore, bool) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
@@ -109,11 +116,13 @@ func (v *Vars) GetMessageSet(label string) (*types.MessageStore, bool) {
 	return set, ok
 }
 
+// Counter threadsafe counter
 type Counter struct {
 	val  int
 	lock *sync.Mutex
 }
 
+// NewCounter returns a counter
 func NewCounter() *Counter {
 	return &Counter{
 		val:  0,
@@ -121,12 +130,14 @@ func NewCounter() *Counter {
 	}
 }
 
+// Incr increments the counter
 func (c *Counter) Incr() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.val = c.val + 1
 }
 
+// Value returns the counter value
 func (c *Counter) Value() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()

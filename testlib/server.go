@@ -67,6 +67,7 @@ func (srv *TestingServer) Start() {
 	<-srv.QuitCh()
 }
 
+// Done returns the channel which will be closed once all testcases are run
 func (srv *TestingServer) Done() chan string {
 	return srv.doneCh
 }

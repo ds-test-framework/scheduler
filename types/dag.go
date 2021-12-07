@@ -198,7 +198,7 @@ func (d *EventDAG) Clone() *EventDAG {
 }
 
 func (d *EventDAG) AddNode(e *Event, parents []*Event) {
-	parentNodes := make([]*EventNode, len(parents))
+	parentNodes := make([]*EventNode, 0)
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	for _, p := range parents {

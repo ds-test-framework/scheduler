@@ -76,7 +76,7 @@ func (v *Vars) Exists(label string) bool {
 	return ok
 }
 
-// SetCounter sets a counter instance at the specified label
+// SetCounter sets a counter instance at the specified label with initial value 1
 func (v *Vars) SetCounter(label string) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
@@ -128,6 +128,12 @@ func NewCounter() *Counter {
 		val:  0,
 		lock: new(sync.Mutex),
 	}
+}
+
+func (c *Counter) SetValue(v int) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.val = v
 }
 
 // Incr increments the counter

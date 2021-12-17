@@ -10,11 +10,15 @@ import (
 )
 
 const (
-	StartStateLabel   = "startState"
-	FailStateLabel    = "failState"
+	// StartStateLabel is the start state label of a state machine
+	StartStateLabel = "startState"
+	// FailStateLabel is the failure state label
+	FailStateLabel = "failState"
+	// SuccessStateLabel is the state label of the success state
 	SuccessStateLabel = "successState"
 )
 
+// StateMachineBuilder struct defines a builder pattern to create a state machine
 type StateMachineBuilder struct {
 	stateMachine *StateMachine
 	curState     *State
@@ -33,6 +37,7 @@ func (s StateMachineBuilder) On(cond Condition, stateLabel string) StateMachineB
 	}
 }
 
+// MarkSuccess marks the current state of the builder as a success state
 func (s StateMachineBuilder) MarkSuccess() StateMachineBuilder {
 	s.curState.Success = true
 	return s
@@ -45,6 +50,7 @@ type State struct {
 	Success     bool                 `json:"success"`
 }
 
+// Is returns true if the label matches with the current state label
 func (s *State) Is(l string) bool {
 	return s.Label == l
 }

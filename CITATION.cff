@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Nagendra
+    given-names: Srinidhi
+    orcid: https://orcid.org/0000-0002-7171-5543
+title: "Scheduler for distributed systems testing"
+version: 1.9.5
+date-released: 2021-12-17

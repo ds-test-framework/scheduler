@@ -81,6 +81,7 @@ func (c *HandlerCascade) HandleEvent(e *types.Event, ctx *testlib.Context) []*ty
 	return ret
 }
 
+// Name implements Handler
 func (c *HandlerCascade) Name() string {
 	return "HandlerCascade"
 }
